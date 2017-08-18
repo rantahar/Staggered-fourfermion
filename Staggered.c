@@ -1,7 +1,8 @@
 /****************************************************************
- * Simulate 2 flavors of staggered fermions using the fermion bag  
- * algorithm (arXiv:0910.5736) with a mass term.
- *
+ * Simulate 2 flavors of staggered fermions with a four fermion
+ * interaction using the fermion bag algorithm (arXiv:0910.5736).
+ * Measure the bilinear condensate using a mass term as an
+ * external source , similarly to arxiv 1609.08541.
  ****************************************************************/
 #ifdef DEBUG
 #include <fenv.h>
@@ -46,7 +47,7 @@ void remove_monomer( int x, int x2 );
 
 
 
-
+/* Write the current configuration into a file */
 void write_config(){
   FILE * config_file;
   char filename[100];
@@ -72,7 +73,7 @@ void write_config(){
   free(buffer);
 }
 
-
+/* Read the configuration file */
 void read_config(){
   FILE * config_file;
   char filename[100];
@@ -103,9 +104,7 @@ void read_config(){
 
 
 
-
-
-
+/* Map ND-vector to an index */
 int site_vector_to_index( int vector[] ){
 
   int index = vector[ND-1];
@@ -114,6 +113,7 @@ int site_vector_to_index( int vector[] ){
   return index;
 }
 
+/* Map site index to an ND-vector */
 void site_index_to_vector(int index, int vector[] ){
   int i = index;
 
@@ -132,7 +132,7 @@ void site_index_to_vector(int index, int vector[] ){
 
 /* Turn a monomer on at a link */
 void occupy_site(int x1, int x2, int m){
-  if ( occupation_field[m][x1] == 0 && occupation_field[m][x2] == 0 ){
+  if ( occupation_field[m][x1] == UNOCCUPIED && occupation_field[m][x2] == UNOCCUPIED ){
     occupation_field[m][x1] = OCCUPIED;
     occupation_field[m][x2] = OCCUPIED;
 #ifdef DEBUG
@@ -146,9 +146,9 @@ void occupy_site(int x1, int x2, int m){
 
 /* Turn a link off */
 void free_site(int x1, int x2, int m){
-  if ( occupation_field[m][x1] != 0 && occupation_field[m][x2] != 0 ){
-    occupation_field[m][x1] = 0;
-    occupation_field[m][x2] = 0;
+  if ( occupation_field[m][x1] != UNOCCUPIED && occupation_field[m][x2] != UNOCCUPIED ){
+    occupation_field[m][x1] = UNOCCUPIED;
+    occupation_field[m][x2] = UNOCCUPIED;
 #ifdef DEBUG
     printf("Turned off flavor type %d at %d and %d\n",m,x1,x2);
 #endif
@@ -166,9 +166,7 @@ void free_site(int x1, int x2, int m){
  */
 int addable_sites(){
   int free_sites=0;
-  //for(int bi=0; bi<BLOCK_VOLUME ; bi++){
   for(int i=0; i<VOLUME ; i++){
-    //int i = block_lattice_sites[bi];
     for(int nu=0; nu<ND; nu++){
       int j = neighbour[nu][i];
       if ( (fourfermion_monomer[i] == 0) && (fourfermion_monomer[j] == 0) &&
@@ -181,10 +179,9 @@ int addable_sites(){
   return free_sites;
 }
 
+/* Count sites where mass monomers can be added */
 int addable_sites_mass( int f ){
   int free_sites=0;
-  //for(int bi=0; bi<BLOCK_VOLUME ; bi++){
-  //  int i = block_lattice_sites[bi];
   for(int i=0; i<VOLUME ; i++){  
     for(int nu=0; nu<ND; nu++){
       int j = neighbour[nu][i];
@@ -197,7 +194,7 @@ int addable_sites_mass( int f ){
   return free_sites;
 }
 
-
+/* The number of addable sites after removing from two sites */
 int addable_sites_after_removing( int x1, int x2){
   fourfermion_monomer[x1] = 0; fourfermion_monomer[x2] = 0;
   occupation_field[0][x1] = 0; occupation_field[0][x2] = 0;
@@ -209,6 +206,7 @@ int addable_sites_after_removing( int x1, int x2){
   return free_sites;
 }
 
+/* The number of addable sites after removing from two sites */
 int addable_sites_mass_after_removing( int x1, int x2, int f ){
   mass_monomer[f][x1] = 0; mass_monomer[f][x2] = 0;
   occupation_field[f][x1] = 0; occupation_field[f][x2] = 0;
@@ -219,6 +217,7 @@ int addable_sites_mass_after_removing( int x1, int x2, int f ){
 }
 
 
+/* The number of sites where monomers can be removed */
 int removable_sites(){
   int occupied_sites=0;
   //for(int bi=0; bi<BLOCK_VOLUME ; bi++){
@@ -236,6 +235,7 @@ int removable_sites(){
   return occupied_sites;
 }
 
+/* The number of sites where mass monomers can be removed */
 int removable_sites_mass( int f ){
   int occupied_sites=0;
   //for(int bi=0; bi<BLOCK_VOLUME ; bi++){
@@ -252,7 +252,7 @@ int removable_sites_mass( int f ){
   return occupied_sites;
 }
 
-
+/* The number of removable sites after adding two sites */
 int removable_sites_after_adding( int x1, int x2){
   fourfermion_monomer[x1] = 1; fourfermion_monomer[x2] = 1;
   occupation_field[0][x1] = 1; occupation_field[0][x2] = 1;
@@ -264,6 +264,7 @@ int removable_sites_after_adding( int x1, int x2){
   return occupied_sites;
 }
 
+/* The number of removable sites after adding two sites */
 int removable_sites_mass_after_adding( int x1, int x2, int f){
   mass_monomer[f][x1] = 1; mass_monomer[f][x2] = 1;
   occupation_field[f][x1] = 1; occupation_field[f][x2] = 1;
@@ -288,9 +289,10 @@ int removable_sites_mass_after_adding( int x1, int x2, int f){
 
 
 
+
+#ifndef ANTIPERIODIC_MASS
 /* Suggest adding monomers
  */
-#ifndef ANTIPERIODIC_MASS
 int add_fourfermion_monomer()
 {
   int success = 0, x1,x2;
@@ -298,20 +300,16 @@ int add_fourfermion_monomer()
   int addable = addable_sites();
   if( addable > 0 ){
 
-  do { /* Site needs to be fully unoccupied */
-   //int bx1 = (int) (mersenne()*BLOCK_VOLUME);
+  do { 
    x1 = (int) (mersenne()*VOLUME);
-   //x1 = block_lattice_sites[bx1];
    int nu = (int) (mersenne()*ND);
    x2 = neighbour[nu][x1];
   } while ( (fourfermion_monomer[x1] == 1) || (fourfermion_monomer[x2] == 1) ||
             (occupation_field[0][x1] == 1) || (occupation_field[0][x2] == 1) ||
             (occupation_field[1][x1] == 1) || (occupation_field[1][x2] == 1) ) ;
 
-    //printf("  Adding four fermion monomer at %d and %d \n",x1,x2);
     double d = det_add_monomers( x1, x2, flavorlist );
     double n_factor = addable / (double)removable_sites_after_adding(x1,x2);
-    //printf("Factor %g\n",n_factor);
     double p = U*U*d * n_factor ;
     if( mersenne() < p ) {
       occupy_site( x1, x2, 0 );
@@ -323,7 +321,6 @@ int add_fourfermion_monomer()
       n_fourfermion_monomer+=2;
       success = 1;
       update_current_determinant(flavorlist);
-      //printf("Accepted\n");
     }
   
 
@@ -331,7 +328,8 @@ int add_fourfermion_monomer()
   return success;
 }
 
-
+/* Suggest adding monomers
+ */
 int add_mass_monomer()
 {
   int success = 0;
@@ -343,17 +341,13 @@ int add_mass_monomer()
   int addable = addable_sites_mass(f);
   if( addable > 0 ){
 
-  do { /* Site needs to be fully unoccupied */
-   //int bx1 = (int) (mersenne()*BLOCK_VOLUME);
-   //x1 = block_lattice_sites[bx1];
+  do {
    x1 = (int) (mersenne()*VOLUME);
    int nu = (int) (mersenne()*ND);
    x2 = neighbour[nu][x1];
   } while ( (mass_monomer[f][x1] == 1)     || (mass_monomer[f][x2] == 1) ||
             (occupation_field[f][x1] == 1) || (occupation_field[f][x2] == 1) ) ;
 
-
-    //printf("  Adding mass monomer flavor %d at %d and %d \n",f,x1,x2);
     double d = det_add_monomers( x1, x2, flavorlist );
     double p = m*m*d * addable / (double)removable_sites_mass_after_adding(x1,x2,f);
     if( mersenne() < p ) {
@@ -364,12 +358,14 @@ int add_mass_monomer()
       n_mass_monomer[f] += 2;
       success = 1;
       update_current_determinant(flavorlist);
-      //printf("Accepted\n");
     }
   }
 
   return success;
 }
+
+/* Suggest removing monomers
+ */
 int remove_fourfermion_monomer()
 {
   int success = 0;
@@ -386,10 +382,8 @@ int remove_fourfermion_monomer()
             (occupation_field[0][x1] == 0) || (occupation_field[0][x2] == 0) ||
             (occupation_field[1][x1] == 0) || (occupation_field[1][x2] == 0) ) ;
 
-    //printf(" Removing four fermion monomer at %d and %d \n",x1,x2);
     double d = det_remove_monomers( x1, x2, flavorlist  );
     double n_factor = removable / (double)addable_sites_after_removing(x1,x2);
-    //printf("Factor %g\n",n_factor);
     double p = d/(U*U) * n_factor ;
     if( mersenne() < p ){
       free_site( x1, x2, 0 );
@@ -401,11 +395,13 @@ int remove_fourfermion_monomer()
       n_fourfermion_monomer-=2;
       success = 1;
       update_current_determinant(flavorlist);
-      //printf("Accepted\n");
     }
   }
   return success;
 }
+
+/* Suggest removing monomers
+ */
 int remove_mass_monomer()
 {
   int success = 0;
@@ -423,7 +419,6 @@ int remove_mass_monomer()
    x2 = neighbour[nu][x1];
   } while ( (mass_monomer[f][x1] == 0)     || (mass_monomer[f][x2] == 0) ||
             (occupation_field[f][x1] == 0) || (occupation_field[f][x2] == 0) ) ;
-    //printf(" Removing mass monomer flavor %d at %d and %d \n",f,x1,x2);
     double d = det_remove_monomers( x1, x2, flavorlist );
     double p = d/(m*m) * (double)removable / (double)addable_sites_mass_after_removing(x1,x2,f);
     if( mersenne() < p ) {
@@ -434,13 +429,17 @@ int remove_mass_monomer()
       n_mass_monomer[f] -= 2;
       success = 1;
       update_current_determinant(flavorlist);
-      //printf("Accepted\n");
     }
   }
 
   return success;
 }
+
+
 #define N_MOVE_ATTEMPS 1
+
+/* Suggest moving monomers
+ */
 int move_fourfermion_monomer()
 {
   int moves = 0;
@@ -448,21 +447,16 @@ int move_fourfermion_monomer()
     int x1, x2;
     int flavorlist[N_FLAVOR] = {1,1};
 
-    //int move_ind = (int) (mersenne()*n_move_pairs);
-    //x1 = move_pairs[move_ind][0];
-    //x2 = move_pairs[move_ind][1];
     x1 = (int) (mersenne()*VOLUME);
     int nu = mersenne()*NDIRS;
     x2 = neighbour[nu][x1];
     nu = mersenne()*NDIRS;
     x2 = neighbour[nu][x2];
 
-    //if( mersenne() > 0.5){ int tmp=x2; x2=x1; x1=tmp; } /* switch */
     if ( (fourfermion_monomer[x1] == 1) && (fourfermion_monomer[x2] == 0) &&
          (occupation_field[0][x1] == 1) && (occupation_field[0][x2] == 0) &&
          (occupation_field[1][x1] == 1) && (occupation_field[1][x2] == 0) ) 
     {
-      //printf("  Moving mass monomer flavor %d at %d and %d \n",f,x1,x2);
       double p = det_move_monomers( x1, x2, flavorlist );
       if( mersenne() < p ) {
         occupation_field[0][x1]=0;
@@ -473,14 +467,14 @@ int move_fourfermion_monomer()
         fourfermion_monomer[x2] = 1;
         moves++;
         update_current_determinant(flavorlist);
-        //printf("Accepted\n");
       }
     }
   }
   return moves;
 }
 
-
+/* Suggest moving monomers
+ */
 int move_mass_monomer()
 {
   int moves = 0;
@@ -490,20 +484,15 @@ int move_mass_monomer()
     int flavorlist[N_FLAVOR] = {0,0};
     flavorlist[f] = 1;
 
-    //int move_ind = (int) (mersenne()*n_move_pairs);
-    //x1 = move_pairs[move_ind][0];
-    //x2 = move_pairs[move_ind][1];
     x1 = (int) (mersenne()*VOLUME);
     int nu = mersenne()*NDIRS;
     x2 = neighbour[nu][x1];
     nu = mersenne()*NDIRS;
     x2 = neighbour[nu][x2];
 
-    //if( mersenne() > 0.5){ int tmp=x2; x2=x1; x1=tmp; } /* switch */
     if ( (mass_monomer[f][x1] == 1) && (mass_monomer[f][x2] == 0) &&
          (occupation_field[f][x1] == 1) && (occupation_field[f][x2] == 0) )
     {
-      //printf("  Moving mass monomer flavor %d at %d and %d \n",f,x1,x2);
       double p = det_move_monomers( x1, x2, flavorlist );
       if( mersenne() < p ) {
         occupation_field[f][x1]=0;
@@ -512,7 +501,6 @@ int move_mass_monomer()
         mass_monomer[f][x2] = 1;
         moves++;
         update_current_determinant(flavorlist);
-        //printf("Accepted\n");
       }
     }
     
@@ -520,6 +508,10 @@ int move_mass_monomer()
   return moves;
 }
 
+/* Try to turn a four fermion monomer into two mass monomers
+ * or a mass monomer into two fourfermion monomers
+ * This does not require calculating a determinant
+ */
 int switch_monomers()
 {
   int success = 0, x1;
@@ -556,25 +548,19 @@ int switch_monomers()
   return success;
 }
 
-#else
+#else //ANTIPERIODIC_MASS
 
 int add_fourfermion_monomer()
 {
   int success = 0, x1,x2;
   int flavorlist[N_FLAVOR] = {1,1};
-  //int addable = VOLUME-n_fourfermion_monomer;
-  //if( addable > 0 ){
 
-  //do { /* Site needs to be fully unoccupied */
-   x1 = (int) (mersenne()*VOLUME);
-  //} while ( (fourfermion_monomer[x1] == 1) || (occupation_field[0][x1] == 1) ||
-  //          (occupation_field[1][x1] == 1) ) ;
+  x1 = (int) (mersenne()*VOLUME);
 
   if( (fourfermion_monomer[x1] == 0) && (occupation_field[0][x1] == 0) &&
       (occupation_field[1][x1] == 0) ){
     double d = det_add_monomers( x1, flavorlist );
-    double n_factor = 1;// addable / (double)(n_fourfermion_monomer+1);
-    double p = U*d * n_factor ;
+    double p = U*d;
     if( mersenne() < p ) {
       occupation_field[0][x1] = 1;
       occupation_field[1][x1] = 1;
@@ -584,29 +570,23 @@ int add_fourfermion_monomer()
       n_fourfermion_monomer+=1;
       success = 1;
       update_current_determinant(flavorlist);
-      //printf("Accepted\n");
     }
   }
   return success;
 }
+
 int remove_fourfermion_monomer()
 {
   int success = 0;
   int x1, x2;
   int flavorlist[N_FLAVOR] = {1,1};
-  //int removable = n_fourfermion_monomer;
-  //if( removable > 0 ){
 
-  //do { /* Site needs to be fully occupied */
-   x1 = (int) (mersenne()*VOLUME);
-  //} while ( (fourfermion_monomer[x1] == 0) || (occupation_field[0][x1] == 0) ||
-  //          (occupation_field[1][x1] == 0) ) ;
+  x1 = (int) (mersenne()*VOLUME);
 
   if( (fourfermion_monomer[x1] == 1) && (occupation_field[0][x1] == 1) &&
       (occupation_field[1][x1] == 1) ) {
     double d = det_remove_monomers( x1, flavorlist  );
-    double n_factor = 1;//removable / (VOLUME-n_fourfermion_monomer+1);
-    double p = d/U * n_factor ;
+    double p = d/U;
     if( mersenne() < p ){
       occupation_field[0][x1] = 0;
       occupation_field[1][x1] = 0;
@@ -616,11 +596,11 @@ int remove_fourfermion_monomer()
       n_fourfermion_monomer-=1;
       success = 1;
       update_current_determinant(flavorlist);
-      //printf("Accepted\n");
     }
   }
   return success;
 }
+/* Mass monomers don't exist */
 int add_mass_monomer(){}
 int remove_mass_monomer(){}
 int move_fourfermion_monomer(){}
@@ -635,116 +615,18 @@ int switch_monomers(){}
 
 
 
-int in_block( int x ){
-  if(BLOCK_VOLUME >= VOLUME) return 1;
-  for(int i=0; i<BLOCK_VOLUME; i++)
-    if ( block_lattice_sites[i] == x ) 
-      return 1;
-  return 0;
-}
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void update_block(){
-  static int init = 1;
-  if(init){
-     BLOCK_VOLUME=1;
-     for(int dir=0;dir<ND;dir++) BLOCK_VOLUME*=BLOCKSIZE;
-     block_lattice_sites = malloc( BLOCK_VOLUME*sizeof(int) );
-     int vol = 1;
-     for(int dir=0;dir<ND;dir++) vol*=(BLOCKSIZE);
-     move_pairs = malloc( 2*ND*ND*vol*sizeof(int*) );
-     for(int i=0;i<2*ND*ND*vol;i++) move_pairs[i] = malloc( 2*sizeof(int) );
-  }
-  
-  if( init || BLOCK_VOLUME < VOLUME ){
-
-  this_block = mersenne()*VOLUME;
-  int v[ND];
-  site_index_to_vector( this_block, v);
-
-  int nb=0;
-  for(int i=0; i<VOLUME; i++){
-    int vi[ND];
-    int in_block=1;
-    site_index_to_vector( i, vi);
-    for(int dir=0;dir<ND;dir++){
-      int block_ind = (vi[dir]-v[dir]+Ldim[dir])%Ldim[dir];
-      in_block *= block_ind>=0 && block_ind<BLOCKSIZE; 
-    }
-    if( in_block )  block_lattice_sites[nb++]=i;
-  }
-
-  /* create a list of nearest to nearest neighbours for moving monomers (this takes a while) */
-  n_move_pairs=0;
-  for(int i=0; i<BLOCK_VOLUME; i++){
-    int x = block_lattice_sites[i];
-    for( int dir1=0; dir1<ND; dir1++){ 
-      int x2 = neighbour[dir1][ neighbour[dir1][x] ];
-      if( in_block(x2) == 1 ) { move_pairs[n_move_pairs][0] = x;
-                                move_pairs[n_move_pairs][1] = x2;
-                                n_move_pairs++;
-                              }
-      x2 = neighbour[opp_dir(dir1)][ neighbour[opp_dir(dir1)][x] ];
-      if( in_block(x2) == 1 ) { move_pairs[n_move_pairs][0] = x;
-                                move_pairs[n_move_pairs][1] = x2;
-                                n_move_pairs++;
-                              }
-      for( int dir2=0; dir2<dir1; dir2++) {
-        x2 = neighbour[dir2][ neighbour[dir1][x] ];
-        if( in_block(x2) == 1 ) { move_pairs[n_move_pairs][0] = x;
-                                  move_pairs[n_move_pairs][1] = x2;
-                                  n_move_pairs++;
-                                }
-        x2 = neighbour[dir2][ neighbour[opp_dir(dir1)][x] ];
-        if( in_block(x2) == 1 ) { move_pairs[n_move_pairs][0] = x;
-                                  move_pairs[n_move_pairs][1] = x2;
-                                  n_move_pairs++;
-                                }
-        x2 = neighbour[opp_dir(dir2)][ neighbour[dir1][x] ];
-        if( in_block(x2) == 1 ) { move_pairs[n_move_pairs][0] = x;
-                                  move_pairs[n_move_pairs][1] = x2;
-                                  n_move_pairs++;
-                                }
-        x2 = neighbour[opp_dir(dir2)][ neighbour[opp_dir(dir1)][x] ];
-        if( in_block(x2) == 1 ) { move_pairs[n_move_pairs][0] = x;
-                                  move_pairs[n_move_pairs][1] = x2;
-                                  n_move_pairs++;
-                                }
-      }
-    }
-  }
-  }
-  init = 0;
-}
-
-
-
-
-
+/* Do a number of random update attempts  */
+#define N_updates 20
 void update( int *additions, int *removals, int *moves,int *m_additions, int *m_removals, int *m_moves, int *switches )
 {
   int changes=0;
-  //update_block();
 
-  for( int i=0; i<20; i++){
-    int step = mersenne()*10;
+  for( int i=0; i<N_updates; i++){
+    int step = mersenne()*10;  //gives a 40% change of trying a switch
     switch(step){
       case 0:
         *additions += add_fourfermion_monomer();
@@ -772,7 +654,9 @@ void update( int *additions, int *removals, int *moves,int *m_additions, int *m_
 }
 
 
-/* Update using a worm istead of a local update */
+/* Update using a worm istead of a local update
+ * Usually more effective in adding masses
+ */
 void worm_update( int *additions, int *removals, int *moves,int *m_additions, int *m_removals, int *m_moves, int *switches ){
   
    /* Try flipping monomers, helps at large mass */
@@ -787,36 +671,37 @@ void worm_update( int *additions, int *removals, int *moves,int *m_additions, in
    flavorlist[f] = 1;
    double notdone = 0;
 
-
-       if( (occupation_field[f][x] == 0) && (occupation_field[f][x2] == 0) ){
-        /* Start by creating two monomers
-         * one is the head and the other is a mass monomer 
-         * Note the missing weight m, added at the end
-         */
-         double p = det_add_monomers( x, x2, flavorlist );
-         if( mersenne() < p ){
-           occupation_field[f][x] = 1;
-           occupation_field[f][x2] = 1;
-           mass_monomer[f][x2] = 1;
-           update_current_determinant(flavorlist);
-           notdone = 1;
-           n_mass_monomer[f]+=1;
-           n_occupied[f]+=2;
-         }
-       } else if(mass_monomer[f][x] == 1) {
-         /* Start by turning a mass monomer into  the head
-          */
-         if( mersenne() < 1./(m*m) ){
-           mass_monomer[f][x] = 0;
-           notdone = 1;
-           n_mass_monomer[f]-=1;
-         }
-       }
+   /* Try starting a worm at a random site */
+   if( (occupation_field[f][x] == 0) && (occupation_field[f][x2] == 0) ){
+     /* Start by creating two monomers
+      * one is the head and the other is a mass monomer 
+      * Note the missing weight m, added at the end
+      */
+     double p = det_add_monomers( x, x2, flavorlist );
+     if( mersenne() < p ){
+        occupation_field[f][x] = 1;
+        occupation_field[f][x2] = 1;
+        mass_monomer[f][x2] = 1;
+        update_current_determinant(flavorlist);
+        notdone = 1;
+        n_mass_monomer[f]+=1;
+        n_occupied[f]+=2;
+     }
+   } else if(mass_monomer[f][x] == 1) {
+     /* Start by turning a mass monomer into  the head
+      */
+     if( mersenne() < 1./(m*m) ){
+        mass_monomer[f][x] = 0;
+        notdone = 1;
+        n_mass_monomer[f]-=1;
+     }
+  }
 
   while(notdone) {
     int step = mersenne()*5;
     int mu = mersenne()*NDIRS;
     int newx = neighbour[mu][x];
+
     switch(step){
     case 0:
       if( mersenne() < m*m ){
@@ -826,9 +711,10 @@ void worm_update( int *additions, int *removals, int *moves,int *m_additions, in
         notdone = 0;
       }
       break;
+
     case 1:
       if( mass_monomer[f][newx] == 1 ) {
-        /* Worm annihilates with a mass monomer */
+        /* Worm annihilates with a neighbouring mass monomer */
         double p = det_remove_monomers( x, newx, flavorlist );
         if( mersenne() < p ){
           occupation_field[f][newx] = 0;
@@ -841,9 +727,12 @@ void worm_update( int *additions, int *removals, int *moves,int *m_additions, in
         }
       }
       break;
+
     case 2:
       if( fourfermion_monomer[newx] == 1 ) {
-        /* Annihilate it, head of worm moves and changes flavor */
+        /* Remove the four fermion monomer,
+         * head of worm moves and changes flavor
+         */
         double p = det_remove_monomers( x, newx, flavorlist );
         if( mersenne() < p/U ){
            occupation_field[f][newx] = 0;
@@ -859,9 +748,10 @@ void worm_update( int *additions, int *removals, int *moves,int *m_additions, in
         }
       }
       break;
+
     case 3:
       if( occupation_field[!f][x] == 0 && occupation_field[!f][newx] == 0   ) {
-        /* Free sites, try to create a four fermion monomer */
+        /* Try to create a four fermion monomer */
         int f2 = !f; int flist2[2] = {0,0};
         flist2[f2]=1;
         double p = det_add_monomers( x, newx, flist2 );
@@ -876,31 +766,44 @@ void worm_update( int *additions, int *removals, int *moves,int *m_additions, in
            f = !f;
            flavorlist[f] = 1;
            n_fourfermion_monomer+=1;
-          } // if mersenne
-        } // if unoccupied
+          }
+        } 
        break;
+
     case 4:
       mu = mersenne()*NDIRS;
       newx = neighbour[mu][newx];
       if( occupation_field[f][newx] == 0   ) {
-        /* Free sites, try to create a four fermion monomer */
+        /* Just move the head of the worm
+         * works even at U=0 */
         double p = det_move_monomers( x, newx, flavorlist );
         if( mersenne() < p ){
            occupation_field[f][x] = 0;
            occupation_field[f][newx] = 1;
            x = newx; 
            update_current_determinant(flavorlist);
-          } // if mersenne
-        } // if unoccupied
+          } 
+        } 
        break;
     } //switch 
-  } //while
+  } //while notdone
   
 }
 
 
 
-#ifndef ANTIPERIODIC_MASS
+#ifndef MASS_IN_MATRIX
+/* Measure the susceptibilities using a worm update method
+ * aa is measures the same flavor susceptibility and 
+ * ab measures the mixed flavor susceptibility
+ *
+ * The worm begins by creating two sources with the probability 
+ * from a partition function with two insertions. One of the sources 
+ * moves on the lattice, according to the same probability density,
+ * changing the configuration on the way. The number of configurations
+ * counts the weight of the modified partition function against the
+ * unmodified one, that is, the measurement. 
+ */
 int n_susc1_measurements=1000;
 void susceptibility_aa(){
   int step=0;
@@ -929,7 +832,7 @@ void susceptibility_aa(){
       }
 
       /* Move the monomer */
-      while(notdone) { //print_config();
+      while(notdone) { 
         step++;
         int dir, newx;
 

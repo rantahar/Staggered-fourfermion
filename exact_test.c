@@ -1,6 +1,5 @@
 /****************************************************************
- * Simulate 2 flavors of staggered fermions using the fermion bag  
- * algorithm (arXiv:0910.5736).
+ * An exact calculation by enumerating all configurations
  *
  ****************************************************************/
 #ifdef DEBUG
@@ -8,6 +7,11 @@
 #endif
 
 #include "Staggered.h"
+
+#ifdef FLUCTUATION_DETERMINANT
+fluctuation determinant not available for exact test
+use full determinant
+#endif
 
 /* storage */
 int    **eta;   //Staggered eta matrix

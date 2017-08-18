@@ -317,7 +317,7 @@ void init_Dinv(){
 
 
 #ifdef FULL_DETERMINANT
-/* Fermion determinant effective at large U (few unoccupied sites) */
+/* Just calculate the determinant of the full fermion matrix */
 double determinant( int f ){
   static int init = 1;
   if(init) {
@@ -387,164 +387,21 @@ double determinant( int f ){
 }
 #endif
 
-#ifdef LARGE_U
-/* Fermion determinant effective at large U (few unoccupied sites) */
-double determinant(){
-  static int init = 1;
-  if(init) {
-    init_fermion_matrix( );
-    init = 0;
-  }
-  int n=(VOLUME-n_occupied[0])/2;
-  if( n==0 ) {
-    new_determinant = 1;
-    return( new_determinant/current_determinant );
-  }
-
-  int info;
-  int *ipiv;
-  ipiv = malloc( n*sizeof(int) );
-  double det = 1;
-  double *M = malloc(n*n*sizeof(double));
-  for(int i=0; i<n*n; i++) M[i] = 0;
-
-  /* Construct the even to odd matrix of unoccupied sites */
-  int v[ND];
-  int *evenlist,*oddlist;
-  evenlist = malloc( n*sizeof(int) );
-  oddlist  = malloc( n*sizeof(int) );
-  int ie=0, io=0;
-  for(int x=0; x<VOLUME; x++) if( occupation_field[0][x]==0 ) {
-    site_index_to_vector(x,v);
-    int n = 0;
-    for( int nu=0; nu<ND; nu++ ) n+=v[nu];
-    if( n%2 == 0 ){
-      evenlist[ie] = x;
-      ie++;
-    } else {
-      oddlist[io] = x;
-      io++;
-    }
-  }
-
-  for(int ie=0; ie<n; ie++) for(int io=0; io<n; io++){
-    M[ie+n*io] = D[evenlist[ie]+VOLUME*oddlist[io]] ;
-  }
-
-  /*for(int ie=0; ie<n; ie++) {
-    for(int io=0; io<n; io++) {
-      printf(" %3.2f", M[ie+n*io]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-  */
-
-
-  LAPACK_dgetrf( &n, &n, M, &n, ipiv, &info );
-  
-  for(int i=0; i<n; i++) {
-    det *= M[i*n+i];
-    if( ipiv[i] != i+1 ) det*=-1; 
-  }
-    
-  free(M);
-  free(ipiv);
-  free(evenlist);
-  free(oddlist);
-  new_determinant = det*det*det*det;
-  return( new_determinant/current_determinant );
-}
-#endif
-
-
-
-
-
-
-#ifdef SMALL_U
-double determinant(){
-  static int ndet=0;
-  static int init = 1;
-  if(init) {
-    init_Dinv( );
-    init = 0;
-  }
-
-  int n=n_occupied[0]/2;
-  if( n==0 ) {
-    new_determinant = 1;
-    #ifdef DEBUG
-    printf("Det %d  %g (m=0)\n", ndet, new_determinant/current_determinant );
-    ndet++;
-    #endif
-    return( new_determinant/current_determinant );
-  }
-
-  int info;
-  int *ipiv;
-  ipiv = malloc( n*sizeof(int) );
-  double det = 1;
-  double *M = malloc(n*n*sizeof(double));
-  for(int i=0; i<n*n; i++) M[i] = 0;
-
-  /* Construct the even to odd matrix of occupied sites */
-  int v[ND];
-  int *evenlist,*oddlist;
-  evenlist = malloc( n*sizeof(int) );
-  oddlist  = malloc( n*sizeof(int) );
-  int ie=0, io=0;
-  for(int x=0; x<VOLUME; x++) if( occupation_field[0][x]==OCCUPIED ) {
-    site_index_to_vector(x,v);
-    int n = 0;
-    for( int nu=0; nu<ND; nu++ ) n+=v[nu];
-    if( n%2 == 0 ){
-      evenlist[ie] = global_to_even_index[x];
-      ie++;
-    } else {
-      oddlist[io] = global_to_odd_index[x];
-      io++;
-    }
-  }
-
-  for(int ie=0; ie<n; ie++) for(int io=0; io<n; io++){
-    M[io+n*ie] = Dinv[oddlist[io]+VOLUME/2*evenlist[ie]] ;
-  }
-
-
-  LAPACK_dgetrf( &n, &n, M, &n, ipiv, &info );
-  
-  for(int i=0; i<n; i++) {
-    det *= M[i*n+i];
-    if( ipiv[i] != i+1 ) det*=-1; 
-  }
-    
-  free(M);
-  free(ipiv);
-  free(evenlist);
-  free(oddlist);
-
-  new_determinant = det*det*det*det;
-
-  #ifdef DEBUG
-  printf("Det %d %g  %g\n", ndet, det, new_determinant/current_determinant );
-  ndet++;
-  #endif
-  
-  return( new_determinant/current_determinant );
-}
-
-
-
-#endif //SMALL_U
-
-
 
 
 
 
 #else // defined FLUCTUATION_DETERMINANT
+/* A more efficient method using a background configuration
+ * and calculating the change in the determinant compared to
+ * that background.
+ * Uses an even to odd matrix and does not work with MASS_IN_MATRIX
+ */
 
+#ifdef MASS_IN_MATRIX
+fluctuation determinant only written for an even-odd decomposed matrix
+disable mass_in_matrix
+#endif
 
 /* The background configuration */
 int n_bc_monomers[N_FLAVOR];

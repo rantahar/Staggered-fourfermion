@@ -21,25 +21,26 @@ int VOLUME;
 int * block_lattice_sites; //does not include positive boundary
 int ** move_pairs;
 int n_move_pairs;
-int this_block;
-#define BLOCKSIZE 4
-#define N_BLOCK_UPDATES 1
-int BLOCK_VOLUME;
 
+//Choose spatial boundary conditions (temporal alway antiperiodic)
 #define PERIODIC
 //#define ANTIPERIODIC
+
+//Uncomment to include site mass in the determinant
+//(does not work with fluctuation determinant)
 //#define MASS_IN_MATRIX
 
 /* Flavors */
 #define N_FLAVOR 2
-#define OCCUPIED 1
-#define NONE -100   //A meta value for sites that don't exist
 
-/* Choose here the method for calculatign the derivative */
-//#define SMALL_U
-//#define LARGE_U
+/* Choose here the method for calculating the derivative */
 //#define FULL_DETERMINANT
 #define FLUCTUATION_DETERMINANT
+
+/* field values */
+#define UNOCCUPIED 0
+#define OCCUPIED 1
+#define NONE -100   //A meta value for sites that don't exist
 
 
 /* In Staggered.c */
