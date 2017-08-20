@@ -13,18 +13,18 @@
 /* Lattice size and dimensions */
 #define ND 4
 /* Size of the lattice dimensions */
-static int Ldim[ND] = { 2, 2, 2, 2 };
+static int Ldim[ND] = { 6, 6, 6, 6 };
 
 #define NDIRS (2*ND)
 int VOLUME;
 
-int * block_lattice_sites; //does not include positive boundary
-int ** move_pairs;
-int n_move_pairs;
+// Choose update method
+#define WORM_UPDATE
+//#define LOCAL_UPDATE
 
 //Choose spatial boundary conditions (temporal alway antiperiodic)
-#define PERIODIC
-//#define ANTIPERIODIC
+//#define PERIODIC
+#define ANTIPERIODIC
 
 //Uncomment to include site mass in the determinant
 //(does not work with fluctuation determinant)
@@ -64,9 +64,9 @@ double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]);
 void update_current_determinant( int do_flavor[N_FLAVOR] );
 void update_background( int monomer );
 
-
-
-
+/* update functions */
+void worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches );
+void local_update( int *additions, int *removals, int *moves,int *m_additions, int *m_removals, int *m_moves, int *switches );
 
 
 

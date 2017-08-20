@@ -1,6 +1,5 @@
 /****************************************************************
- * Simulate 2 flavors of staggered fermions using the fermion bag  
- * algorithm (arXiv:0910.5736).
+ * Fermion matrix and determinant
  *
  ****************************************************************/
 #ifdef DEBUG
@@ -18,7 +17,7 @@ extern int max_fluctuations;
 extern double linkmass;
 extern double m;
 double *D;
-double * Dinv;
+double *Dinv;
 
 
 /* Map indexes of even and odd sites to global indexes */
@@ -28,19 +27,20 @@ int * global_to_even_index;
 int * global_to_odd_index;
 
 
-//Remember the current determinant to avoid recalculating
+/* Remember the current determinant to avoid recalculating 
+ * update after accepting a new configuration
+ */
 double current_determinant[N_FLAVOR];
 double new_determinant[N_FLAVOR];
-/* Update the current determinant after accepting a configuration */
 void update_current_determinant( int do_flavor[N_FLAVOR] ){
   for(int n=0; n<N_FLAVOR;n++) if(do_flavor[n]) current_determinant[n] = new_determinant[n];
 }
 
 
-#ifdef MASS_IN_MATRIX //Antiperiodic boundaries
+/* Definitions of the fermion matrix */
+#ifdef MASS_IN_MATRIX
 #ifdef ANTIPERIODIC
-void init_fermion_matrix( )
-{
+void init_fermion_matrix( ) {
   /* Set up the fermion matrix */
   int n = VOLUME;
   D = malloc(n*n*sizeof(double));
@@ -84,6 +84,7 @@ void init_fermion_matrix( )
     D[x1+n*x1] += m;
     int nu=0;
     {
+      //First the time direction, antiperiodic
       int x2 = neighbour[nu][x1];
       int v1[ND],v2[ND];
       site_index_to_vector(x1,v1);
@@ -103,6 +104,7 @@ void init_fermion_matrix( )
         D[x1+n*x2] += -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
       }
     }
+    //Spatial directions, periodic
     for( int nu=1;nu<ND;nu++){
       int x2 = neighbour[nu][x1];
       int v1[ND],v2[ND];
@@ -152,13 +154,6 @@ void init_fermion_matrix( )
       
     }
   }
-
-  /*for( int i=0;i<n;i++) {
-    for( int j=0;j<n;j++) {
-      printf(" %4.2f ",D[i+n*j]);
-    }
-    printf("\n");
-  }*/
 }
 #endif
 
@@ -173,6 +168,7 @@ void init_fermion_matrix( )
   for( int x1=0;x1<n;x1++){
     int nu=0;
     {
+      //First the time direction, antiperiodic
       int x2 = neighbour[nu][x1];
       int v1[ND],v2[ND];
       site_index_to_vector(x1,v1);
@@ -192,6 +188,7 @@ void init_fermion_matrix( )
         D[x1+n*x2] += -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
       }
     }
+    //Spatial directions, periodic
     for( int nu=1;nu<ND;nu++){
       int x2 = neighbour[nu][x1];
       int v1[ND],v2[ND];
@@ -211,9 +208,9 @@ void init_fermion_matrix( )
 #endif //MASS_IN_MATRIX
 
 
+/* Set up indexes at even and odd sites */
 void init_evenodd_index( )
 {
-  /* Set up indexes at even and odd sites */
   even_to_global_index = malloc( VOLUME/2*sizeof(int) );
   odd_to_global_index  = malloc( VOLUME/2*sizeof(int) );
   global_to_even_index = malloc( VOLUME*sizeof(int) );
@@ -241,7 +238,7 @@ void init_evenodd_index( )
 
 
 
-
+/* Save the propagator matrix to avoid recalculation when possible */
 void write_Dinv(){
   FILE * Dinv_file;
   char filename[100] = "Dinv";
@@ -258,10 +255,12 @@ void write_Dinv(){
 }
 
 
+/* Initialize the propagator matrix, from the file if possible */
 void init_Dinv(){
   
   init_evenodd_index();
 
+  // Try loading from the file
   FILE * Dinv_file;
   char filename[100] = "Dinv";
   int n = VOLUME/2;
@@ -274,6 +273,7 @@ void init_Dinv(){
     fclose(Dinv_file);
   } else {
 
+    /* File not found or loading failed */
     printf("No Dinv file\n");
     init_fermion_matrix( );
     
@@ -287,6 +287,7 @@ void init_Dinv(){
       Dinv[ie+n*io] = D[even_to_global_index[ie]+VOLUME*odd_to_global_index[io]] ;
     }
 
+    /* Invert using lapack routines */
     int lwork=n*n;
     double *work;
     work = malloc( lwork*sizeof(double) );
@@ -305,6 +306,7 @@ void init_Dinv(){
     free(work);
     free(ipiv);
     free(D);
+    //Save to file
     write_Dinv();
   }
   
@@ -312,35 +314,30 @@ void init_Dinv(){
 
 
 
-
-#ifndef FLUCTUATION_DETERMINANT
-
-
 #ifdef FULL_DETERMINANT
 /* Just calculate the determinant of the full fermion matrix */
 double determinant( int f ){
+
+  /* Initialize everything on the first time */
   static int init = 1;
   if(init) {
     init_fermion_matrix( );
     init = 0;
     current_determinant[0] = current_determinant[1] = 1;
   }
+ 
+  /* The size of the matrix */
   int n=(VOLUME-n_occupied[f]);
+
+  /* Determinant of a rank 0 matrix is 1 */
   if( n==0 ) {
     new_determinant[f] = 1;
     return( new_determinant[f]/current_determinant[f] );
   }
 
-  //printf("Full determinant, n=%d\n",n);
+  
 
-  int info;
-  int *ipiv;
-  ipiv = malloc( n*sizeof(int) );
-  double det = 1;
-  double *M = malloc(n*n*sizeof(double));
-  for(int i=0; i<n*n; i++) M[i] = 0;
-
-  /* Construct the even to odd matrix of unoccupied sites */
+  /* Build a list of free sites */
   int v[ND];
   int *freelist;
   freelist = malloc( n*sizeof(int) );
@@ -349,29 +346,28 @@ double determinant( int f ){
     freelist[ind] = x;
     ind++;
   }
-
+  
+  /* Construct the matrix of free sites*/
+  double *M = malloc(n*n*sizeof(double));
+  for(int i=0; i<n*n; i++) M[i] = 0;
   for(int i1=0; i1<n; i1++) for(int i2=0; i2<n; i2++){
     M[i1+n*i2] = D[freelist[i1]+VOLUME*freelist[i2]] ;
   }
 
-  /*for(int i1=0; i1<n; i1++) {
-    for(int i2=0; i2<n; i2++) {
-      printf(" %4.2f", M[i1+n*i2]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-  */
-
-
+  /* Use lapack to calculate the LU decompisition */
+  int info;
+  int *ipiv;
+  ipiv = malloc( n*sizeof(int) );
   LAPACK_dgetrf( &n, &n, M, &n, ipiv, &info );
-  //if(info) printf("Zero at %d\n",info); 
+
+  /* Calculate the determinant */
+  double det = 1;
   for(int i=0; i<n; i++) {
     det *= M[i*n+i];
     if( ipiv[i] != i+1 ) det*=-1; 
-    //printf(" %g %g %d\n",det, M[i*n+i], ipiv[i]!=i+1 );
   }
-    
+  
+  /* Check for negative determinants (in most cases this is debugging) */
   if((det/current_determinant[f])<-1e-30) {
     static int n=0;
     printf("NEGATIVE determinant %d %g %g\n",n, det/current_determinant[f] ,det);
@@ -381,8 +377,8 @@ double determinant( int f ){
   free(M);
   free(ipiv);
   free(freelist);
+
   new_determinant[f] = det;
-  //printf("det %g\n",det);
   return( new_determinant[f]/current_determinant[f] );
 }
 #endif
@@ -391,7 +387,7 @@ double determinant( int f ){
 
 
 
-#else // defined FLUCTUATION_DETERMINANT
+#ifdef FLUCTUATION_DETERMINANT
 /* A more efficient method using a background configuration
  * and calculating the change in the determinant compared to
  * that background.
@@ -410,21 +406,22 @@ int ** bc_evenlist, ** bc_oddlist;
 
 /* Matrices needed for the fluctuation matrix */
 double ***BAP, ***PAC, ***BGC, **Ginv;
-int **newsite, ***new_combination;
+int **newsite,***newcombination;
 
 /* Invert the matrix of propagators between occupied sites
  * Assign the current configuration as the background
  */
 void update_background( int f )
 {
+  /* Initialize everythin on the first call */
   static int init = 1;
   if(init==1){
     Ginv = malloc(N_FLAVOR*sizeof(double*));
     BAP = malloc(N_FLAVOR*sizeof(double*));
     PAC = malloc(N_FLAVOR*sizeof(double*));
     BGC = malloc(N_FLAVOR*sizeof(double*));
-    //new_combination = malloc(N_FLAVOR*sizeof(int*));
     newsite = malloc(N_FLAVOR*sizeof(int*));
+    newcombination = malloc(N_FLAVOR*sizeof(int**));
     bc_occupation_field = malloc(N_FLAVOR*sizeof(int*));
     bc_evenlist = malloc(N_FLAVOR*sizeof(int*));
     bc_oddlist = malloc(N_FLAVOR*sizeof(int*));
@@ -434,16 +431,17 @@ void update_background( int f )
       BAP[n] = malloc(VOLUME/2*sizeof(double*));
       PAC[n] = malloc(VOLUME/2*sizeof(double*));
       BGC[n] = malloc(VOLUME/2*sizeof(double*));
-      //new_combination[n] = malloc( sizeof(int*)*VOLUME/2 );
       for(int i=0; i<VOLUME/2; i++){
         BAP[n][i] = malloc(VOLUME/2*sizeof(double));
         PAC[n][i] = malloc(VOLUME/2*sizeof(double));
         BGC[n][i] = malloc(VOLUME/2*sizeof(double));
-        //new_combination[n][i] = malloc( sizeof(int)*VOLUME/2 );
-     }
+      }
    
       newsite[n] = malloc( sizeof(int)*VOLUME );
-  
+      newcombination[n] = malloc( sizeof(int*)*VOLUME );
+      for(int i=0; i<VOLUME; i++)
+        newcombination[n][i] = malloc( sizeof(int)*VOLUME );
+
       bc_occupation_field[n] = malloc( VOLUME*sizeof(int) );
       bc_evenlist[n] = malloc( VOLUME/2*sizeof(int) );
       bc_oddlist[n]  = malloc( VOLUME/2*sizeof(int) );
@@ -457,9 +455,11 @@ void update_background( int f )
     bc_occupation_field[f][x] = occupation_field[f][x];
   }
   
+  /* Size of the background matrix */
   int n_bc = n_occupied[f]/2;
 
-  /*If no occupied sites, determinant of rank 0 is 1 */
+  /* Invert the background matrix
+   * Lapack fails for rank zero, so skip   */
   if( n_bc > 0 ){
     int *ipiv = malloc( n_bc*sizeof(int) );
     int info;
@@ -479,7 +479,6 @@ void update_background( int f )
       } else {
         if( occupation_field[f][x]==OCCUPIED ){
           bc_oddlist[f][ioo] = global_to_odd_index[x];
-          //printf("Occupied site %d (odd %d), bc index %d\n",x,bc_oddlist[ioo],ioo);
           ioo++;
         }
       }
@@ -490,7 +489,7 @@ void update_background( int f )
       exit(1);
     }
 
-    /* Construct the inverse of the occupied to occupied propagator */
+    /* Construct the inverse of the matrix propagators over occupied sites */
     for(int ie=0; ie<n_bc; ie++) for(int io=0; io<n_bc; io++){
       Ginv[f][ie+n_bc*io] = Dinv[bc_oddlist[f][io]+VOLUME/2*bc_evenlist[f][ie]];
     }
@@ -499,6 +498,7 @@ void update_background( int f )
       printf("sgetrf returned error %d (zero determinant has been accepted)! \n", info);
       exit(-1);
     }
+
     /* The inversion */
     int lwork=n_bc*n_bc;
     double *work;
@@ -513,22 +513,47 @@ void update_background( int f )
     free(ipiv);
   }
 
-
+  /* Update the saved determinant */
   current_determinant[f] = 1;
+
   /* Mark fluctuation matrix at all sites as not calculated */
   for( int a=0; a<VOLUME; a++ ) newsite[f][a] = 1;
-  //for( int a=0; a<VOLUME/2; a++ ) for( int b=0; b<VOLUME/2; b++ ) 
-  //  new_combination[f][a][b] = 1;
+  for( int a=0; a<VOLUME; a++ ) for( int b=0; b<VOLUME; b++ ) newcombination[f][a][b] = 1;
 
   if(init==1) init = 0;
+
   #ifdef DEBUG
   printf("New background for fermion type %d with %d monomers\n", f, n_bc_monomers[f]);
   #endif
 }
 
 
+/* Find site in background array using binary search */
+int find_in_bc( int x, int * list, int n ){
+  
+  int i=n/2, u=n, l=0;
+  do{
+    if( list[i] == x ) return i;
+    if( list[i] > x ) {
+      u = i;
+      i = l+(u-l)/2;
+    } else {
+      l = i;
+      i = l+(u-l)/2 ;
+    }
+  } while(1);
+
+  /*
+  int i;
+  for( i=0; i<n; i++) if( list[i] == x ) break ;
+  return i;
+  */
+}
+
+
+/* Calculate the determinant of the current configuration */
 int n_fluctuations[N_FLAVOR];
-/* Determinants after adding or removing links */
+int *added_evenlist,*added_oddlist,*removed_evenlist,*removed_oddlist;
 double determinant( int f ){
   int n_bc = n_bc_monomers[f]/2;
   int n_added_even=0, n_removed_even=0, n_added_odd=0, n_removed_odd=0;
@@ -536,11 +561,14 @@ double determinant( int f ){
 
   /* Construct a list of changes to the background */
   int v[ND];
-  int *added_evenlist,*added_oddlist,*removed_evenlist,*removed_oddlist;
-  added_evenlist = malloc( max_fluctuations*sizeof(int) );
-  added_oddlist  = malloc( max_fluctuations*sizeof(int) );
-  removed_evenlist = malloc( max_fluctuations*sizeof(int) );
-  removed_oddlist  = malloc( max_fluctuations*sizeof(int) );
+  static int init = 1;
+  if(init == 1){
+    added_evenlist = malloc( max_fluctuations*sizeof(int) );
+    added_oddlist  = malloc( max_fluctuations*sizeof(int) );
+    removed_evenlist = malloc( max_fluctuations*sizeof(int) );
+    removed_oddlist  = malloc( max_fluctuations*sizeof(int) );
+    init = 0;
+  }
   for(int x=0; x<VOLUME; x++) if(occupation_field[f][x] != bc_occupation_field[f][x]) {
     site_index_to_vector(x,v);
     int n = 0;
@@ -548,26 +576,19 @@ double determinant( int f ){
     if( n%2 == 0 ){
       if( occupation_field[f][x] == OCCUPIED ){
          added_evenlist[n_added_even] = global_to_even_index[x];
-         //printf("Even site number %d, %d, added\n",x, added_evenlist[n_added_even]);
          n_added_even++;
       } else  {
          /* index in the background matrix required for removed sites */
-         int i;
-         for( i=0; i<n_bc_monomers[f]; i++) if( bc_evenlist[f][i] == global_to_even_index[x] ) break ;
-         removed_evenlist[n_removed_even] = i;
-         //printf("Even site number %d, %d, removed\n",i, bc_evenlist[i]);
+         removed_evenlist[n_removed_even] = find_in_bc( global_to_even_index[x], bc_evenlist[f], n_bc_monomers[f]/2 );
          n_removed_even++;
       }
     } else {
       if( occupation_field[f][x]==OCCUPIED ){
          added_oddlist[n_added_odd] = global_to_odd_index[x];
-         //printf("Odd site number %d, %d, added\n",x, added_oddlist[n_added_odd]);
          n_added_odd++;
       } else  {
-         int i;
-         for( i=0; i<n_bc_monomers[f]; i++) if( bc_oddlist[f][i] == global_to_odd_index[x] ) break ;
-         removed_oddlist[n_removed_odd] = i;
-         //printf("Odd site number %d, %d, removed\n",i, bc_oddlist[i]);
+         /* index in the background matrix required for removed sites */
+         removed_oddlist[n_removed_odd] = find_in_bc( global_to_odd_index[x], bc_oddlist[f], n_bc_monomers[f]/2 );
          n_removed_odd++;
       }
     }
@@ -577,53 +598,59 @@ double determinant( int f ){
     exit(1);
   }
 
+  /* The size of the fluctuation matrix */
   int n_fl = n_added_even + n_removed_odd;
   n_fluctuations[f] = n_fl;
 
-  //printf("Calculating fluctuation with %d additions and removals\n",n_fl);
   if(n_fl==0){  /* No fluctuations, trivial case */
     new_determinant[f] = 1;
 #ifdef DEBUG
     printf("Det %d  %g %g (n_fl=0)\n", ndet, 1.0, new_determinant[f]/current_determinant[f] );
     ndet++;
 #endif
-    free(removed_evenlist);
-    free(removed_oddlist);
-    free(added_evenlist);
-    free(added_oddlist);
     return new_determinant[f]/current_determinant[f];
   }
 
+
   /* Construct new parts of the fluctuation matrix */
   for( int b=0; b<n_added_even; b++) if( newsite[f][added_evenlist[b]] == 1 ){
+    double D[n_bc];
+    for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
     for( int a=0; a<n_bc; a++)
     {
       double sum=0;
-      for( int l=0; l<n_bc; l++) sum += Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2]*Ginv[f][l+a*n_bc];
+      double G[n_bc];
+      for( int l=0; l<n_bc; l++) G[l] = Ginv[f][l+a*n_bc];
+      for( int l=0; l<n_bc; l++) sum += D[l]*G[l];
       BAP[f][a][added_evenlist[b]] = sum;
     }
     newsite[f][added_evenlist[b]] = 0;
   }
 
   for( int a=0; a<n_added_odd; a++) if( newsite[f][VOLUME/2+added_oddlist[a]] == 1 ){
+    double D[n_bc];
+    for( int k=0; k<n_bc; k++) D[k] = Dinv[added_oddlist[a]+bc_evenlist[f][k]*VOLUME/2];
     for( int b=0; b<n_bc; b++)  { 
       double sum = 0;
-      for( int k=0; k<n_bc; k++) sum += Ginv[f][b+k*n_bc]*Dinv[added_oddlist[a]+bc_evenlist[f][k]*VOLUME/2];
+      double G[n_bc];
+      for( int k=0; k<n_bc; k++) G[k] = Ginv[f][b+k*n_bc];
+      for( int k=0; k<n_bc; k++) sum += D[k]*G[k];
       PAC[f][added_oddlist[a]][b] = -sum;
     }
     newsite[f][VOLUME/2+added_oddlist[a]] = 0;
   }
 
-
   for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++) 
-  //if( new_combination[f][added_evenlist[b]][added_oddlist[a]] == 1 )
+    if( newcombination[f][added_evenlist[b]][VOLUME/2+added_oddlist[a]] == 1 )
   {
     double sum = 0;
-    for( int l=0; l<n_bc; l++)
-      sum += Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2]*PAC[f][added_oddlist[a]][l];
-    BGC[f][b][a] = Dinv[added_oddlist[a]+added_evenlist[b]*VOLUME/2] + sum;
-
-    //new_combination[f][added_evenlist[b]][added_oddlist[a]] = 0;
+    double D[n_bc], P[n_bc];
+    for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
+    for( int l=0; l<n_bc; l++) P[l] = PAC[f][added_oddlist[a]][l];
+    for( int l=0; l<n_bc; l++) sum += D[l]*P[l];
+    BGC[f][added_evenlist[b]][added_oddlist[a]] =
+      Dinv[added_oddlist[a]+added_evenlist[b]*VOLUME/2] + sum;
+    newcombination[f][added_evenlist[b]][VOLUME/2+added_oddlist[a]] = 0;
   }
 
 
@@ -637,49 +664,21 @@ double determinant( int f ){
   for( int a=0; a<n_removed_even; a++) for( int b=0; b<n_added_even; b++)
     F[a*n_fl+(n_removed_odd+b)] = BAP[f][removed_evenlist[a]][added_evenlist[b]];
   for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++)
-    F[(n_removed_even+a)*n_fl+(n_removed_odd+b)] = BGC[f][b][a];
+    F[(n_removed_even+a)*n_fl+(n_removed_odd+b)] = BGC[f][added_evenlist[b]][added_oddlist[a]];
+
 
   /* determinant from LU */
   double det=1;
   int ipiv[n_fl], info;
   LAPACK_dgetrf( &n_fl, &n_fl, F, &n_fl, ipiv, &info );
-  double logdet = 0;
   for(int i=0; i<n_fl; i++) {
-    logdet += log(fabs(F[i*n_fl+i]));
-    //if( ipiv[i] != i+1 ) det*=-1; 
+    det *= F[i*n_fl+i];
   }
-  det *= exp(logdet);
+
+  free(F);
 
 
   new_determinant[f] = det*det;
-#ifdef DEBUG
-  printf("Det %d %g  %g %g  %g\n", ndet, det, new_determinant[f], current_determinant[f], new_determinant[f]/current_determinant[f] );
-  ndet++;
-  if( new_determinant[f]/current_determinant[f] > 1e50 ){
-    for(int b=0; b<n_bc_monomers[f]/2; b++) {
-      for(int a=0; a<n_bc_monomers[f]/2; a++) {
-        printf(" %5.2f", Ginv[f][b+n*a]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-
-    for(int ie=0; ie<n_fl; ie++) {
-      for(int io=0; io<n_fl; io++) {
-        printf(" %8.5f", F[ie+n_fl*io]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-    exit(1);
-  }
-#endif
-
-  free(F);
-  free(removed_evenlist);
-  free(removed_oddlist);
-  free(added_evenlist);
-  free(added_oddlist);
 
   return( new_determinant[f]/current_determinant[f] );
 }
@@ -693,10 +692,11 @@ double determinant( int f ){
    and calling determinant().
    Unfortunately the background needs to be updated here when necessary. */
 #ifndef ANTIPERIODIC_MASS
+int init = 1;
 double det_add_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
 
   #ifdef FLUCTUATION_DETERMINANT
-  static int init = 1;
+  /* Initiate fluctuations */
   if( init ) {
     for( int f=0; f<N_FLAVOR; f++ ) n_fluctuations[f] = 0;
     init = 0;
@@ -706,17 +706,17 @@ double det_add_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
   }
   #endif
   
-  //current_determinant[0] = current_determinant[1] = 1;
-  double det = 1;//./(determinant( 0 )*determinant( 1 ));
+  /* Calculate the determinant after the change */
+  double det = 1;
   for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]){
+    /* Just change the field */
     occupation_field[f][x1] = OCCUPIED;
     occupation_field[f][x2] = OCCUPIED;
     n_occupied[f] += 2;
-  //}
-    det *= determinant(f);// determinant( 0 )*determinant( 1 );
-  //for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]){
-    occupation_field[f][x1] = 0;
-    occupation_field[f][x2] = 0;
+    /* And get the determinant */
+    det *= determinant(f);
+    occupation_field[f][x1] = UNOCCUPIED;
+    occupation_field[f][x2] = UNOCCUPIED;
     n_occupied[f] -= 2;
   }
 
@@ -725,7 +725,7 @@ double det_add_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
 
 double det_move_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
   #ifdef FLUCTUATION_DETERMINANT
-  static int init = 1;
+  /* Initiate fluctuations */
   if( init ) {
     for( int f=0; f<N_FLAVOR; f++ ) n_fluctuations[f] = 0;
     init = 0;
@@ -735,13 +735,16 @@ double det_move_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
   }
   #endif
 
+  /* Calculate the determinant after the change */
   double det = 1;
   for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]){
-    occupation_field[f][x1] = 0;
+    /* Just change the field */
+    occupation_field[f][x1] = UNOCCUPIED;
     occupation_field[f][x2] = OCCUPIED;
     det *= determinant( f );
+    /* And get the determinant */
     occupation_field[f][x1] = OCCUPIED;
-    occupation_field[f][x2] = 0;
+    occupation_field[f][x2] = UNOCCUPIED;
   }
 
   return det;
@@ -749,9 +752,8 @@ double det_move_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
 
 
 double det_remove_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
-
   #ifdef FLUCTUATION_DETERMINANT
-  static int init = 1;
+  /* Initiate fluctuations */
   if( init ) {
     for( int f=0; f<N_FLAVOR; f++ ) n_fluctuations[f] = 0;
     init = 0;
@@ -761,15 +763,15 @@ double det_remove_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
   }
   #endif
 
-  //current_determinant[0] = current_determinant[1] = 1;
-  double det = 1;//./(determinant( 0 )*determinant( 1 ));
+  /* Calculate the determinant after the change */  
+  double det = 1;
   for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]){
-    occupation_field[f][x1] = 0;
-    occupation_field[f][x2] = 0;
+    /* Just change the field */
+    occupation_field[f][x1] = UNOCCUPIED;
+    occupation_field[f][x2] = UNOCCUPIED;
     n_occupied[f] -= 2;
-  //}
-    det *= determinant(f);//determinant( 0 )*determinant( 1 );
-  //for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]){
+    det *= determinant(f);
+    /* And get the determinant */
     occupation_field[f][x1] = OCCUPIED;
     occupation_field[f][x2] = OCCUPIED;
     n_occupied[f] += 2;
@@ -780,9 +782,10 @@ double det_remove_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
 
 #else
 
+int init = 1;
 double det_add_monomers(int x1, int do_flavor[N_FLAVOR]){
   #ifdef FLUCTUATION_DETERMINANT
-  static int init = 1;
+  /* Initiate fluctuations */
   if( init ) {
     for( int f=0; f<N_FLAVOR; f++ ) n_fluctuations[f] = 0;
     init = 0;
@@ -792,13 +795,15 @@ double det_add_monomers(int x1, int do_flavor[N_FLAVOR]){
   }
   #endif
   
-  //current_determinant[0] = current_determinant[1] = 1;
+  /* Calculate the determinant after the change */  
   double det = 1;
   for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]) {
+    /* Just change the field */
     occupation_field[f][x1] = OCCUPIED;
     n_occupied[f] += 1;
+    /* And get the determinant */
     det *= fabs(determinant(f));
-    occupation_field[f][x1] = 0;
+    occupation_field[f][x1] = UNOCCUPIED;
     n_occupied[f] -= 1;
   }
 
@@ -807,7 +812,7 @@ double det_add_monomers(int x1, int do_flavor[N_FLAVOR]){
 
 double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]){
   #ifdef FLUCTUATION_DETERMINANT
-  static int init = 1;
+  /* Initiate fluctuations */
   if( init ) {
     for( int f=0; f<N_FLAVOR; f++ ) n_fluctuations[f] = 0;
     init = 0;
@@ -817,11 +822,13 @@ double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]){
   }
   #endif
 
-  //current_determinant[0] = current_determinant[1] = 1;
-  double det = 1;//./(determinant( 0 )*determinant( 1 ));
+  /* Calculate the determinant after the change */    
+  double det = 1;
   for(int f=0; f<N_FLAVOR; f++) if(do_flavor[f]){
-    occupation_field[f][x1] = 0;
+    /* Just change the field */
+    occupation_field[f][x1] = UNOCCUPIED;
     n_occupied[f] -= 1;
+    /* And get the determinant */
     det *= fabs(determinant(f));
     occupation_field[f][x1] = OCCUPIED;
     n_occupied[f] += 1;
