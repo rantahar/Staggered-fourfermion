@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mersenne.h"
-#include <lapacke/lapacke.h>
+//#include <lapacke/lapacke.h>
+#include <lapacke.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -13,7 +14,7 @@
 /* Lattice size and dimensions */
 #define ND 4
 /* Size of the lattice dimensions */
-static int Ldim[ND] = { 6, 6, 6, 6 };
+static int Ldim[ND] = { 4, 4, 4, 4 };
 
 #define NDIRS (2*ND)
 int VOLUME;

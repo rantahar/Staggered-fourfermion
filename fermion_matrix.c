@@ -688,6 +688,7 @@ double determinant( int f ){
 
 
 
+
 /* Calculate weight for specific operations simply by changing the field
    and calling determinant().
    Unfortunately the background needs to be updated here when necessary. */
@@ -837,3 +838,83 @@ double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]){
   return det;
 }
 #endif
+
+
+
+
+/* Calculate the link vev */
+void link_vev(){
+  init_fermion_matrix( );
+  
+  int n = VOLUME - n_occupied[0] ;
+  
+  int info;
+  int *ipiv;
+  ipiv = malloc( n*sizeof(int) );
+  double *Dinv = malloc( n*n*sizeof(double) );
+  for(int i=0; i<n*n; i++) Dinv[i] = 0;
+
+  /* Construct the even to odd matrix
+   * using only unoccupied sites
+   */
+  for(int ie=0; ie<n; ie++){
+    int gie = even_to_global_index[ie];
+    if( occupation_field[0][gie] )  for(int io=0; io<n; io++){
+        int gio = odd_to_global_index[ie];
+        if( occupation_field[0][gio] ) Dinv[ie+n*io] = D[ gie+VOLUME*gio ] ;
+    }
+  }
+
+  /* Invert using lapack routines */
+  int lwork=n*n;
+  double *work;
+  work = malloc( lwork*sizeof(double) );
+  LAPACK_dgetrf( &n, &n, Dinv, &n, ipiv, &info );
+  if( info != 0 ) {
+    printf("init_Dinv: sgetrf returned an error %d! \n", info);
+    exit(-1);
+  }
+
+  LAPACK_dgetri(&n, Dinv, &n, ipiv, work, &lwork, &info); 
+  if( info != 0 ) {
+    printf("init_Dinv: sgetri returned an error %d! \n", info);
+    exit(-1);
+  }
+  
+  for(int ie=0; ie<n; ie++){
+    int gie = even_to_global_index[ie];
+    if( occupation_field[0][gie] ) {
+        int mu=0;
+        int gio = neighbour[mu][gie];
+        if( occupation_field[0][gio] )
+          linkvev += ksi[nu][x2]*Dinv[ie+n*io];
+    }
+  }
+  
+  printf("LINKVEV %g\n",linkvev/VOLUME);
+  
+  free(work);
+  free(ipiv);
+  free(D);
+  free(Dinv);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
