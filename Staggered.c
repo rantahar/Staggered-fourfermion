@@ -516,6 +516,7 @@ int main(int argc, char* argv[])
     /* Zero measurements */
     double fourfermion_monomer_density=0;
     double mass_monomer_density[N_FLAVOR];
+    double linkvev = 0;
     for(int m=0; m<N_FLAVOR; m++) mass_monomer_density[m] = 0;
 
     /* For keeping track of changes */
@@ -537,7 +538,11 @@ int main(int argc, char* argv[])
       /* sum measurements */
       fourfermion_monomer_density += n_fourfermion_monomer/(double)VOLUME;
       for(int m=0; m<N_FLAVOR; m++) mass_monomer_density[m] += n_mass_monomer[m]/(double)VOLUME;
+
+      linkvev += link_vev();
     }
+
+    
 
     /* Time and report */
     gettimeofday(&end,NULL);
@@ -554,11 +559,13 @@ int main(int argc, char* argv[])
     printf("MONOMERDENSITY %g ", fourfermion_monomer_density/(double)n_average);
     for(int m=0; m<N_FLAVOR; m++) printf("%g ", mass_monomer_density[m]/(double)n_average);
     printf("\n");
+    printf("LINKVEV %g \n", linkvev/(double)(n_average*VOLUME*2));
     
     /* Susceptibilities */
     //susceptibility_ab();
     //susceptibility_aa();
-    
+    diff = 1e6*(end.tv_sec-start.tv_sec) + end.tv_usec-start.tv_usec;
+    printf("Inversion in %.3g seconds\n", i, n_average, 1e-6*diff );
     /* write checkpoint */
     write_config();
 
