@@ -889,6 +889,7 @@ double link_vev(){
 
     
     int omu = ( mu + ND ) % NDIRS;
+    i2 = neighbour[omu][i1];
     bc_sign = 1;
     if( v1[mu] == 0 ) bc_sign = -1;
     linkvev += bc_sign*ksi[mu][i1] * Dinv[i1+n*i2];
@@ -898,6 +899,7 @@ double link_vev(){
       linkvev += ksi[mu][i1] * Dinv[i1+n*i2];
 
       int omu = ( mu + ND ) % NDIRS;
+      i2 = neighbour[omu][i1];
       linkvev += ksi[mu][i1] * Dinv[i1+n*i2];
     }
   }
