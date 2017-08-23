@@ -562,11 +562,11 @@ int main(int argc, char* argv[])
       /* sum measurements */
       fourfermion_monomer_density += n_fourfermion_monomer/(double)VOLUME;
       for(int m=0; m<N_FLAVOR; m++) mass_monomer_density[m] += n_mass_monomer[m]/(double)VOLUME;
-
-      //link_vev( &linkvev, &sitevev );
     }
 
-    //link_vev( &linkvev, &sitevev );
+#ifdef MEASUREVEV
+    measure_vev( &linkvev, &sitevev );
+#endif
 
     /* Time and report */
     gettimeofday(&end,NULL);

@@ -810,8 +810,9 @@ double det_remove_monomers1(int x1, int do_flavor[N_FLAVOR]){
 
 
 
+#ifdef MEASUREVEV
 /* Calculate the link vev */
-void link_vev( double * linkvev, double * sitevev ){
+void measure_vev( double * linkvev, double * sitevev ){
 #ifndef MASS_IN_MATRIX
   init_fermion_matrix( );
 #endif  
@@ -904,7 +905,7 @@ void link_vev( double * linkvev, double * sitevev ){
 #endif
 
 }
-
+#endif
 
 
 

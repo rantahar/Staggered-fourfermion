@@ -38,6 +38,9 @@ int VOLUME;
 //#define FULL_DETERMINANT
 #define FLUCTUATION_DETERMINANT
 
+/* Toggle direct measurement for site and link vev */
+//#ifdef MEASUREVEV
+
 /* field values */
 #define UNOCCUPIED 0
 #define OCCUPIED 1
@@ -65,7 +68,7 @@ double det_remove_monomers1(int x1, int do_flavor[N_FLAVOR]);
 void update_current_determinant( int do_flavor[N_FLAVOR] );
 void update_background( int monomer );
 
-void link_vev( double * linkvev, double * sitevev );
+void measure_vev( double * linkvev, double * sitevev );
 
 /* update functions */
 void worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches );
