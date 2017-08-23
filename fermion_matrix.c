@@ -50,23 +50,17 @@ void init_fermion_matrix( ) {
     D[x1+n*x1] += m;
     for( int nu=0;nu<ND;nu++){
       int x2 = neighbour[nu][x1];
-      int v1[ND],v2[ND];
+      int v1[ND];
+      int bc_sign = 1;
       site_index_to_vector(x1,v1);
-      site_index_to_vector(x2,v2);
-      if( v2[nu] > v1[nu] ) {
-        D[x1+n*x2] += 0.5 * eta[nu][x2] + linkmass * ksi[nu][x2] ;
-      } else {
-        D[x1+n*x2] += -0.5 * eta[nu][x2] - linkmass * ksi[nu][x2] ;
-      }
+      if( v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      D[x1+n*x2] += 0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
 
       int onu = ( nu + ND ) % NDIRS;
       x2 = neighbour[onu][x1];
-      site_index_to_vector(x2,v2);
-      if( v2[nu] > v1[nu] ) {
-        D[x1+n*x2] += 0.5 * eta[nu][x2] - linkmass * ksi[nu][x2] ;
-      } else {
-        D[x1+n*x2] += -0.5 * eta[nu][x2] + linkmass * ksi[nu][x2] ;
-      }
+      site_index_to_vector(x1,v1);
+      bc_sign = 1;
+      if( v1[nu] == 0 ) bc_sign = -1;
     }
   }
 }
@@ -89,15 +83,15 @@ void init_fermion_matrix( )
       int v1[ND];
       int bc_sign = 1;
       site_index_to_vector(x1,v1);
-      if( v1[mu] == (Ldim[nu]-1) ) bc_sign = -1;
+      if( v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
       D[x1+n*x2] += 0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
 
       int onu = ( nu + ND ) % NDIRS;
       x2 = neighbour[onu][x1];
       site_index_to_vector(x1,v1);
       bc_sign = 1;
-      if( v1[mu] == 0 ) bc_sign = -1;
-      D[x1+n*x2] += 0.5 * bc_sign * eta[nu][x1] - bc_sign * linkmass * ksi[nu][x1] ;
+      if( v1[nu] == 0 ) bc_sign = -1;
+      D[x1+n*x2] += -0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
     }
     //Spatial directions, periodic
     for( int nu=1;nu<ND;nu++){
@@ -125,24 +119,18 @@ void init_fermion_matrix( )
   for( int x1=0;x1<n;x1++){
     for( int nu=0;nu<ND;nu++){
       int x2 = neighbour[nu][x1];
-      int v1[ND],v2[ND];
+      int v1[ND];
+      int bc_sign = 1;
       site_index_to_vector(x1,v1);
-      site_index_to_vector(x2,v2);
-      if( v2[nu] > v1[nu] ) {
-        D[x1+n*x2] += 0.5 * eta[nu][x2] + linkmass * ksi[nu][x2] ;
-      } else {
-        D[x1+n*x2] += -0.5 * eta[nu][x2] - linkmass * ksi[nu][x2] ;
-      }
+      if( v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      D[x1+n*x2] += 0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
 
       int onu = ( nu + ND ) % NDIRS;
       x2 = neighbour[onu][x1];
-      site_index_to_vector(x2,v2);
-      if( v2[nu] > v1[nu] ) {
-        D[x1+n*x2] += 0.5 * eta[nu][x2] - linkmass * ksi[nu][x2] ;
-      } else {
-        D[x1+n*x2] += -0.5 * eta[nu][x2] + linkmass * ksi[nu][x2] ;
-      }
-      
+      site_index_to_vector(x1,v1);
+      bc_sign = 1;
+      if( v1[nu] == 0 ) bc_sign = -1;
+      D[x1+n*x2] += -0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
     }
   }
 }
@@ -161,35 +149,26 @@ void init_fermion_matrix( )
     {
       //First the time direction, antiperiodic
       int x2 = neighbour[nu][x1];
-      int v1[ND],v2[ND];
+      int v1[ND];
+      int bc_sign = 1;
       site_index_to_vector(x1,v1);
-      site_index_to_vector(x2,v2);
-      if( v2[nu] > v1[nu] ) {
-        D[x1+n*x2] += 0.5 * eta[nu%ND][x1] + linkmass * ksi[nu][x1] ;
-      } else {
-        D[x1+n*x2] += -0.5 * eta[nu%ND][x1] - linkmass * ksi[nu][x1] ;
-      }
+      if( v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      D[x1+n*x2] += 0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
 
       int onu = ( nu + ND ) % NDIRS;
       x2 = neighbour[onu][x1];
-      site_index_to_vector(x2,v2);
-      if( v2[nu] > v1[nu] ) {
-        D[x1+n*x2] += 0.5 * eta[nu][x1] - linkmass * ksi[nu][x1] ;
-      } else {
-        D[x1+n*x2] += -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
-      }
+      site_index_to_vector(x1,v1);
+      bc_sign = 1;
+      if( v1[nu] == 0 ) bc_sign = -1;
+      D[x1+n*x2] += -0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
     }
     //Spatial directions, periodic
     for( int nu=1;nu<ND;nu++){
       int x2 = neighbour[nu][x1];
-      int v1[ND],v2[ND];
-      site_index_to_vector(x1,v1);
-      site_index_to_vector(x2,v2);
-      D[x1+n*x2] += 0.5 * eta[nu%ND][x1] + linkmass * ksi[nu][x1] ;
+      D[x1+n*x2] += 0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
 
       int onu = ( nu + ND ) % NDIRS;
       x2 = neighbour[onu][x1];
-      site_index_to_vector(x2,v2);
       D[x1+n*x2] += -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
     }
   }
@@ -683,7 +662,6 @@ double determinant( int f ){
 /* Calculate weight for specific operations simply by changing the field
    and calling determinant().
    Unfortunately the background needs to be updated here when necessary. */
-#ifndef ANTIPERIODIC_MASS
 int init = 1;
 double det_add_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
 
@@ -772,10 +750,9 @@ double det_remove_monomers(int x1, int x2, int do_flavor[N_FLAVOR]){
   return det;
 }
 
-#else
+#ifdef MASS_IN_MATRIX
 
-int init = 1;
-double det_add_monomers(int x1, int do_flavor[N_FLAVOR]){
+double det_add_monomers1(int x1, int do_flavor[N_FLAVOR]){
   #ifdef FLUCTUATION_DETERMINANT
   /* Initiate fluctuations */
   if( init ) {
@@ -802,7 +779,7 @@ double det_add_monomers(int x1, int do_flavor[N_FLAVOR]){
   return det;
 }
 
-double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]){
+double det_remove_monomers1(int x1, int do_flavor[N_FLAVOR]){
   #ifdef FLUCTUATION_DETERMINANT
   /* Initiate fluctuations */
   if( init ) {
@@ -834,9 +811,11 @@ double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]){
 
 
 /* Calculate the link vev */
-double link_vev(){
+void link_vev( double * linkvev, double * sitevev ){
+#ifndef MASS_IN_MATRIX
   init_fermion_matrix( );
-  
+#endif  
+
   int n = VOLUME ;
   
   int info;
@@ -875,8 +854,6 @@ double link_vev(){
     printf("init_Dinv: sgetri returned an error %d! \n", info);
     exit(-1);
   }
-
-  double linkvev=0;
   
   for(int i1=0; i1<n; i1++){
     int mu=0;
@@ -885,23 +862,28 @@ double link_vev(){
     int bc_sign = 1;
     site_index_to_vector(i1,v1);
     if( v1[mu] == (Ldim[mu]-1) ) bc_sign = -1;
-    linkvev += bc_sign*ksi[mu][i1] * Dinv[i1+n*i2];
+    *linkvev += bc_sign*ksi[mu][i1] * Dinv[i1+n*i2];
 
     
     int omu = ( mu + ND ) % NDIRS;
     i2 = neighbour[omu][i1];
     bc_sign = 1;
     if( v1[mu] == 0 ) bc_sign = -1;
-    linkvev += bc_sign*ksi[mu][i1] * Dinv[i1+n*i2];
+    *linkvev += bc_sign*ksi[mu][i1] * Dinv[i1+n*i2];
     
     for( int mu=1;mu<ND;mu++){
       int i2 = neighbour[mu][i1];
-      linkvev += ksi[mu][i1] * Dinv[i1+n*i2];
+      *linkvev += ksi[mu][i1] * Dinv[i1+n*i2];
 
       int omu = ( mu + ND ) % NDIRS;
       i2 = neighbour[omu][i1];
-      linkvev += ksi[mu][i1] * Dinv[i1+n*i2];
+      *linkvev += ksi[mu][i1] * Dinv[i1+n*i2];
     }
+
+    if( occupation_field[0][i1] == UNOCCUPIED )
+      *sitevev += Dinv[i1+n*i1];
+    //if(i1 == 10) printf(" site %g\n", Dinv[i1+n*i1]); 
+    
   }
 
   /*linkvev = 0;
@@ -915,10 +897,12 @@ double link_vev(){
   
   free(work);
   free(ipiv);
-  free(D);
   free(Dinv);
- 
-  return linkvev;
+
+#ifndef MASS_IN_MATRIX
+  free(D);
+#endif
+
 }
 
 

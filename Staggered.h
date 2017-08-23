@@ -24,8 +24,8 @@ int VOLUME;
 //#define LOCAL_UPDATE
 
 //Choose spatial boundary conditions (temporal alway antiperiodic)
-#define PERIODIC
-//#define ANTIPERIODIC
+//#define PERIODIC
+#define ANTIPERIODIC
 
 //Uncomment to include site mass in the determinant
 //(does not work with fluctuation determinant)
@@ -54,18 +54,18 @@ double fM_index( int x1[ND], int x2[ND] );
 void calc_Dinv( );
 double determinant();
 
-#ifndef ANTIPERIODIC_MASS
+
 double det_add_monomers(int x1, int x2, int do_flavor[N_FLAVOR]);
 double det_move_monomers(int x1, int x2, int do_flavor[N_FLAVOR]);
 double det_remove_monomers(int x1, int x2, int do_flavor[N_FLAVOR]);
-#else
-double det_add_monomers(int x1, int do_flavor[N_FLAVOR]);
-double det_remove_monomers(int x1, int do_flavor[N_FLAVOR]);
+#ifdef MASS_IN_MATRIX
+double det_add_monomers1(int x1, int do_flavor[N_FLAVOR]);
+double det_remove_monomers1(int x1, int do_flavor[N_FLAVOR]);
 #endif
 void update_current_determinant( int do_flavor[N_FLAVOR] );
 void update_background( int monomer );
 
-double link_vev();
+void link_vev( double * linkvev, double * sitevev );
 
 /* update functions */
 void worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches );

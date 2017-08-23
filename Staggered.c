@@ -395,6 +395,31 @@ int main(int argc, char* argv[])
     printf("%d , ", Ldim[nu] );
   }
   printf("%d ) lattice\n", Ldim[ND-1]);
+  printf(" with a SU(2Nf) invariant four fermion interaction\n");
+#ifdef PERIODIC
+  printf(" With PERIODIC boundary conditions in spatial directions \n" );
+  printf(" and antiperiodic boundary conditions in the time direction \n" );
+#endif
+#ifdef ANTIPERIODIC
+  printf(" With ANTIPERIODIC boundary conditions\n" );
+#endif
+#ifdef FLUCTUATION_DETERMINANT
+  printf(" Using the fluctuation matrix determinant \n" );
+#endif
+#ifdef FULL_DETERMINANT
+  printf(" Using the full Dirac matrix determinant \n" );
+#endif
+#ifdef  MASS_IN_MATRIX
+  printf(" With the fermion mass in the Dirac matrix  \n" );
+#else
+  printf(" Using mass monomers \n" );
+#endif
+#ifdef LOCAL_UPDATE
+  printf(" Using the LOCAL update method \n" );
+#endif
+#ifdef WORM_UPDATE
+  printf(" Using the WORM update method\n" );
+#endif
   printf(" %d updates\n", n_measure );
   printf(" averaged over %d\n", n_average );
   printf(" fluctuation matrix size %d\n", max_fluctuations );
@@ -485,11 +510,6 @@ int main(int argc, char* argv[])
   } 
 
 
-  
-  /* calculate propagators */
-#ifdef PROPAGATOR_MATRIX
-  calc_Dinv( );
-#endif
 
   /* Setup starting configuration */
   read_config();
@@ -510,13 +530,17 @@ int main(int argc, char* argv[])
   for(int m=0; m<N_FLAVOR; m++) update_background( m );
 #endif
 
+  int flavorlist[N_FLAVOR] = {1,1};
+  for(int m=0; m<N_FLAVOR; m++) determinant(m);
+  update_current_determinant(flavorlist);
+
   /* The update/measure loop */
   for (i=1; i<n_measure+1; i++) {
 
     /* Zero measurements */
     double fourfermion_monomer_density=0;
     double mass_monomer_density[N_FLAVOR];
-    double linkvev = 0;
+    double linkvev = 0, sitevev = 0;
     for(int m=0; m<N_FLAVOR; m++) mass_monomer_density[m] = 0;
 
     /* For keeping track of changes */
@@ -539,10 +563,10 @@ int main(int argc, char* argv[])
       fourfermion_monomer_density += n_fourfermion_monomer/(double)VOLUME;
       for(int m=0; m<N_FLAVOR; m++) mass_monomer_density[m] += n_mass_monomer[m]/(double)VOLUME;
 
-      linkvev += link_vev();
+      //link_vev( &linkvev, &sitevev );
     }
 
-    
+    //link_vev( &linkvev, &sitevev );
 
     /* Time and report */
     gettimeofday(&end,NULL);
@@ -559,13 +583,13 @@ int main(int argc, char* argv[])
     printf("MONOMERDENSITY %g ", fourfermion_monomer_density/(double)n_average);
     for(int m=0; m<N_FLAVOR; m++) printf("%g ", mass_monomer_density[m]/(double)n_average);
     printf("\n");
-    printf("LINKVEV %g \n", linkvev/(double)(n_average*VOLUME*2));
-    
+    //printf("LINKVEV %g \n", linkvev/(double)(VOLUME*2));
+    //printf("SITEVEV %g \n", sitevev/(double)(VOLUME));
+
     /* Susceptibilities */
     //susceptibility_ab();
     //susceptibility_aa();
-    diff = 1e6*(end.tv_sec-start.tv_sec) + end.tv_usec-start.tv_usec;
-    printf("Inversion in %.3g seconds\n", i, n_average, 1e-6*diff );
+
     /* write checkpoint */
     write_config();
 

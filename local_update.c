@@ -8,7 +8,7 @@
 
 #include "Staggered.h"
 
-#ifdef LOCAL_UPDAT
+#ifdef LOCAL_UPDATE
 
 extern double U;
 extern double m;
@@ -145,6 +145,11 @@ int removable_sites_mass_after_adding( int x1, int x2, int f){
 
 
 
+/* Turn a monomer on at a link */
+void occupy_site(int x1, int x2, int m);
+
+/* Turn a link off */
+void free_site(int x1, int x2, int m);
 
 
 
@@ -155,7 +160,8 @@ int removable_sites_mass_after_adding( int x1, int x2, int f){
 
 
 
-#ifndef ANTIPERIODIC_MASS
+
+#ifndef MASS_IN_MATRIX
 /* Suggest adding monomers
  */
 int add_fourfermion_monomer()
@@ -414,76 +420,6 @@ int switch_monomers()
   return success;
 }
 
-#else //ANTIPERIODIC_MASS
-
-int add_fourfermion_monomer()
-{
-  int success = 0, x1,x2;
-  int flavorlist[N_FLAVOR] = {1,1};
-
-  x1 = (int) (mersenne()*VOLUME);
-
-  if( (fourfermion_monomer[x1] == 0) && (occupation_field[0][x1] == 0) &&
-      (occupation_field[1][x1] == 0) ){
-    double d = det_add_monomers( x1, flavorlist );
-    double p = U*d;
-    if( mersenne() < p ) {
-      occupation_field[0][x1] = 1;
-      occupation_field[1][x1] = 1;
-      n_occupied[0]+=1;
-      n_occupied[1]+=1;
-      fourfermion_monomer[x1]=1;
-      n_fourfermion_monomer+=1;
-      success = 1;
-      update_current_determinant(flavorlist);
-    }
-  }
-  return success;
-}
-
-int remove_fourfermion_monomer()
-{
-  int success = 0;
-  int x1, x2;
-  int flavorlist[N_FLAVOR] = {1,1};
-
-  x1 = (int) (mersenne()*VOLUME);
-
-  if( (fourfermion_monomer[x1] == 1) && (occupation_field[0][x1] == 1) &&
-      (occupation_field[1][x1] == 1) ) {
-    double d = det_remove_monomers( x1, flavorlist  );
-    double p = d/U;
-    if( mersenne() < p ){
-      occupation_field[0][x1] = 0;
-      occupation_field[1][x1] = 0;
-      n_occupied[0]-=1;
-      n_occupied[1]-=1;
-      fourfermion_monomer[x1]=0;
-      n_fourfermion_monomer-=1;
-      success = 1;
-      update_current_determinant(flavorlist);
-    }
-  }
-  return success;
-}
-/* Mass monomers don't exist */
-int add_mass_monomer(){}
-int remove_mass_monomer(){}
-int move_fourfermion_monomer(){}
-int move_mass_monomer(){}
-int switch_monomers(){}
-#endif
-
-
-
-
-
-
-
-
-
-
-
 
 /* Do a number of random update attempts  */
 #define N_updates 6
@@ -518,5 +454,185 @@ void local_update( int *additions, int *removals, int *moves,int *m_additions, i
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#else //MASS_IN_MATRIX
+
+int add_fourfermion_monomer()
+{
+  int success = 0, x1,x2;
+  int flavorlist[N_FLAVOR] = {1,1};
+
+  x1 = (int) (mersenne()*VOLUME);
+
+  if( (fourfermion_monomer[x1] == 0) && (occupation_field[0][x1] == 0) &&
+      (occupation_field[1][x1] == 0) ){
+    double d = det_add_monomers1( x1, flavorlist );
+    double p = U*d;
+    if( mersenne() < p ) {
+      occupation_field[0][x1] = 1;
+      occupation_field[1][x1] = 1;
+      n_occupied[0]+=1;
+      n_occupied[1]+=1;
+      fourfermion_monomer[x1]=1;
+      n_fourfermion_monomer+=1;
+      success = 1;
+      update_current_determinant(flavorlist);
+    }
+  }
+  return success;
+}
+
+int remove_fourfermion_monomer()
+{
+  int success = 0;
+  int x1, x2;
+  int flavorlist[N_FLAVOR] = {1,1};
+
+  x1 = (int) (mersenne()*VOLUME);
+
+  if( (fourfermion_monomer[x1] == 1) && (occupation_field[0][x1] == 1) &&
+      (occupation_field[1][x1] == 1) ) {
+    double d = det_remove_monomers1( x1, flavorlist  );
+    double p = d/U;
+    if( mersenne() < p ){
+      occupation_field[0][x1] = 0;
+      occupation_field[1][x1] = 0;
+      n_occupied[0]-=1;
+      n_occupied[1]-=1;
+      fourfermion_monomer[x1]=0;
+      n_fourfermion_monomer-=1;
+      success = 1;
+      update_current_determinant(flavorlist);
+    }
+  }
+  return success;
+}
+
+
+/* Suggest adding two monomers
+ */
+int add_fourfermion_monomer2()
+{
+  int success = 0, x1,x2;
+  int flavorlist[N_FLAVOR] = {1,1};
+ 
+  x1 = (int) (mersenne()*VOLUME);
+  int nu = (int) (mersenne()*ND);
+  x2 = neighbour[nu][x1];
+
+  if( (fourfermion_monomer[x1] == 0) && (occupation_field[0][x1] == 0) &&
+      (occupation_field[1][x1] == 0) && (fourfermion_monomer[x2] == 0) && 
+      (occupation_field[0][x2] == 0) && (occupation_field[1][x2] == 0) ) {
+
+    double d = det_add_monomers( x1, x2, flavorlist );
+    double p = U*U*d ;
+    if( mersenne() < p ) {
+      occupy_site( x1, x2, 0 );
+      occupy_site( x1, x2, 1 );
+      n_occupied[0]+=2;
+      n_occupied[1]+=2;
+      fourfermion_monomer[x1]=1;
+      fourfermion_monomer[x2]=1;
+      n_fourfermion_monomer+=2;
+      success = 1;
+      update_current_determinant(flavorlist);
+    }
+  }
+  return success;
+}
+
+
+/* Suggest removing two monomers
+ */
+int remove_fourfermion_monomer2()
+{
+  int success = 0;
+  int x1, x2;
+  int flavorlist[N_FLAVOR] = {1,1};
+  
+  x1 = (int) (mersenne()*VOLUME);
+  int nu = (int) (mersenne()*ND);
+  x2 = neighbour[nu][x1];
+  if( (fourfermion_monomer[x1] == 1) && (occupation_field[0][x1] == 1) &&
+      (occupation_field[1][x1] == 1) && (fourfermion_monomer[x2] == 1) && 
+      (occupation_field[0][x2] == 1) && (occupation_field[1][x2] == 1) ) {
+
+    double d = det_remove_monomers( x1, x2, flavorlist  );
+    double p = d/(U*U) ;
+    if( mersenne() < p ){
+      free_site( x1, x2, 0 );
+      free_site( x1, x2, 1 );
+      n_occupied[0]-=2;
+      n_occupied[1]-=2;
+      fourfermion_monomer[x1]=0;
+      fourfermion_monomer[x2]=0;
+      n_fourfermion_monomer-=2;
+      success = 1;
+      update_current_determinant(flavorlist);
+    }
+  }
+  return success;
+}
+
+
+
+
+/* Do a number of random update attempts  */
+#define N_updates 4
+void local_update( int *additions, int *removals, int *moves,int *m_additions, int *m_removals, int *m_moves, int *switches )
+{
+  int changes=0;
+
+  for( int i=0; i<N_updates; i++){
+    int step = mersenne()*4; 
+    switch(step){
+      case 0:
+        *additions += add_fourfermion_monomer();
+        break;
+      case 1:
+        *removals += remove_fourfermion_monomer();
+        break;
+      case 2:
+        *additions += 2*add_fourfermion_monomer2();
+        break;
+      case 3:
+        *removals += 2*remove_fourfermion_monomer2();
+        break;
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+#endif
+
+
+
+
 
 #endif //LOCAL_UPDATE
