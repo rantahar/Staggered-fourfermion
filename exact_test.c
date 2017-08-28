@@ -30,12 +30,12 @@ int **neighbour;
  * field stores both, 0 for empty, 1 for monomer and 2+dir for links
  */
 int n_occupied[N_FLAVOR];
-int **occupation_field;
+bool **occupation_field;
 
 int n_fourfermion_monomer;
 int n_mass_monomer[N_FLAVOR];
-int *fourfermion_monomer;
-int **mass_monomer;
+bool *fourfermion_monomer;
+bool **mass_monomer;
 
 static inline int opp_dir(int dir){
   return ( dir + ND ) % NDIRS;
@@ -232,20 +232,20 @@ int main(int argc, char* argv[])
   VOLUME = 1;
   for( int nu=0; nu<ND; nu++) VOLUME*=Ldim[nu];
 
-  occupation_field = malloc( N_FLAVOR*sizeof(int*) );
+  occupation_field = malloc( N_FLAVOR*sizeof(bool*) );
   for( int i=0; i<N_FLAVOR; i++ ){
-    occupation_field[i] = malloc( VOLUME*sizeof(int) );
+    occupation_field[i] = malloc( VOLUME*sizeof(bool) );
     for (int x=0; x<VOLUME; x++) occupation_field[i][x] = 0;
     n_occupied[i] = 0;
   }
 
-  mass_monomer = malloc( N_FLAVOR*sizeof(int*) );
+  mass_monomer = malloc( N_FLAVOR*sizeof(bool*) );
   for( int i=0; i<N_FLAVOR; i++ ){ 
-    mass_monomer[i] = malloc( VOLUME*sizeof(int) );
+    mass_monomer[i] = malloc( VOLUME*sizeof(bool) );
     for (int x=0; x<VOLUME; x++) mass_monomer[i][x] = 0;
     n_mass_monomer[i] = 0;
   }
-  fourfermion_monomer = malloc( VOLUME*sizeof(int) );
+  fourfermion_monomer = malloc( VOLUME*sizeof(bool) );
   for (int x=0; x<VOLUME; x++) fourfermion_monomer[x] = 0;
   n_fourfermion_monomer = 0;
 

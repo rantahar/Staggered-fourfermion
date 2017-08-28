@@ -25,12 +25,12 @@ int max_fluctuations;
  * field stores both, 0 for empty, 1 for monomer and 2+dir for links
  */
 int n_occupied[N_FLAVOR];
-int **occupation_field;
+bool **occupation_field;
 
 int n_fourfermion_monomer;
 int n_mass_monomer[N_FLAVOR];
-int *fourfermion_monomer;
-int **mass_monomer;
+bool *fourfermion_monomer;
+bool **mass_monomer;
 
 /* Neighbour index arrays
  */
@@ -64,7 +64,7 @@ void write_config(){
   
   config_file = fopen(filename,"wb");
   if (config_file){
-    fwrite(buffer, (1+2*N_FLAVOR)*VOLUME, sizeof(int), config_file);
+    fwrite(buffer, sizeof(int), (1+2*N_FLAVOR)*VOLUME, config_file);
     fclose(config_file);
   } else {
     printf("Could not write configuration\n");
@@ -82,8 +82,13 @@ void read_config(){
   config_file = fopen(filename,"rb");
   int * buffer = malloc((1+2*N_FLAVOR)*VOLUME*sizeof(int));
   if (config_file){
-    fread(buffer, (1+2*N_FLAVOR)*VOLUME, sizeof(int), config_file);
+    int read_size = fread(buffer, sizeof(int), (1+2*N_FLAVOR)*VOLUME, config_file);
     fclose(config_file);
+
+    if( read_size != (1+2*N_FLAVOR)*VOLUME ) {
+      printf(" Config file size incorrect ");
+      exit(1);
+    }
   
     for (int i=0; i<VOLUME; i++) {
       fourfermion_monomer[i] = buffer[(1+2*N_FLAVOR)*i];
@@ -92,6 +97,9 @@ void read_config(){
       for (int f=0; f<N_FLAVOR; f++)
         occupation_field[f][i] = buffer[(1+2*N_FLAVOR)*i+3+f];
     }
+
+    printf("Read configuration file\n");
+
   } else {
     printf("No configuration file\n");
     printf("Starting from an empty configuration\n");
@@ -404,21 +412,21 @@ int main(int argc, char* argv[])
   printf(" With ANTIPERIODIC boundary conditions\n" );
 #endif
 #ifdef FLUCTUATION_DETERMINANT
-  printf(" Using the fluctuation matrix determinant \n" );
+  printf(" With the fluctuation matrix determinant \n" );
 #endif
 #ifdef FULL_DETERMINANT
-  printf(" Using the full Dirac matrix determinant \n" );
+  printf(" With the full Dirac matrix determinant \n" );
 #endif
 #ifdef  MASS_IN_MATRIX
   printf(" With the fermion mass in the Dirac matrix  \n" );
 #else
-  printf(" Using mass monomers \n" );
+  printf(" With mass monomers \n" );
 #endif
 #ifdef LOCAL_UPDATE
-  printf(" Using the LOCAL update method \n" );
+  printf(" With the LOCAL update method \n" );
 #endif
 #ifdef WORM_UPDATE
-  printf(" Using the WORM update method\n" );
+  printf(" With the WORM update method\n" );
 #endif
   printf(" %d updates\n", n_measure );
   printf(" averaged over %d\n", n_average );
@@ -433,21 +441,21 @@ int main(int argc, char* argv[])
   for( int nu=0; nu<ND; nu++) VOLUME*=Ldim[nu];
 
   /* field marking fields as occupied of unoccupied */
-  occupation_field = malloc( N_FLAVOR*sizeof(int*) );
+  occupation_field = malloc( N_FLAVOR*sizeof(bool*) );
   for( int i=0; i<N_FLAVOR; i++ ){
-    occupation_field[i] = malloc( VOLUME*sizeof(int) );
+    occupation_field[i] = malloc( VOLUME*sizeof(bool) );
     for (int x=0; x<VOLUME; x++) occupation_field[i][x] = 0;
     n_occupied[i] = 0;
   }
 
   /* field for marking four fermion and mass monomers */
-  mass_monomer = malloc( N_FLAVOR*sizeof(int*) );
+  mass_monomer = malloc( N_FLAVOR*sizeof(bool*) );
   for( int i=0; i<N_FLAVOR; i++ ){ 
-    mass_monomer[i] = malloc( VOLUME*sizeof(int) );
+    mass_monomer[i] = malloc( VOLUME*sizeof(bool) );
     for (int x=0; x<VOLUME; x++) mass_monomer[i][x] = 0;
     n_mass_monomer[i] = 0;
   }
-  fourfermion_monomer = malloc( VOLUME*sizeof(int) );
+  fourfermion_monomer = malloc( VOLUME*sizeof(bool) );
   for (int x=0; x<VOLUME; x++) fourfermion_monomer[x] = 0;
   n_fourfermion_monomer = 0;
 
@@ -548,12 +556,15 @@ int main(int argc, char* argv[])
     #ifdef LOCAL_UPDATE
     int moves = 0, m_moves = 0;
     #endif
+    #ifdef WORM_UPDATE
+    double worm_bilinear = 0;
+    #endif
 
     /* updates */
     for(int j=0; j<n_average; j++){
       /* Update */
       #ifdef WORM_UPDATE
-      worm_update( &additions, &removals, &m_additions, &m_removals, &switches );
+      worm_bilinear += worm_update( &additions, &removals, &m_additions, &m_removals, &switches );
       #endif
       #ifdef LOCAL_UPDATE
       local_update( &additions, &removals, &moves, &m_additions, &m_removals, &m_moves, &switches );
@@ -577,18 +588,23 @@ int main(int argc, char* argv[])
     #endif
     #ifdef WORM_UPDATE
     printf("\n%d, %d updates in %.3g seconds, %d additions, %d removals, %d mass additions, %d mass removals, %d switches\n", i, n_average, 1e-6*diff, additions, removals, m_additions, m_removals, switches );
+    printf("WORMBILINEAR %g\n",worm_bilinear/((double) n_average));
     #endif
  
     /* Basic measurements, monomer densities */
     printf("MONOMERDENSITY %g ", fourfermion_monomer_density/(double)n_average);
     for(int m=0; m<N_FLAVOR; m++) printf("%g ", mass_monomer_density[m]/(double)n_average);
     printf("\n");
-    //printf("LINKVEV %g \n", linkvev/(double)(VOLUME*2));
-    //printf("SITEVEV %g \n", sitevev/(double)(VOLUME));
+    #ifdef MEASUREVEV
+    printf("LINKVEV %g \n", linkvev/(double)(VOLUME*2));
+    printf("SITEVEV %g \n", sitevev/(double)(VOLUME));
+    #endif
 
     /* Susceptibilities */
-    //susceptibility_ab();
-    //susceptibility_aa();
+    #ifdef MEASUREVEV
+    susceptibility_ab();
+    susceptibility_aa();
+    #endif
 
     /* write checkpoint */
     write_config();

@@ -19,12 +19,12 @@ extern double linkmass;
  * field stores both, 0 for empty, 1 for monomer and 2+dir for links
  */
 extern int n_occupied[N_FLAVOR];
-extern int **occupation_field;
+extern bool **occupation_field;
 
 extern int n_fourfermion_monomer;
 extern int n_mass_monomer[N_FLAVOR];
-extern int *fourfermion_monomer;
-extern int **mass_monomer;
+extern bool *fourfermion_monomer;
+extern bool **mass_monomer;
 
 /* Neighbour index arrays
  */
@@ -74,7 +74,7 @@ int switch_monomers()
 
 
 
-void worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches ){
+double worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches ){
   
    /* Try flipping monomers, helps at large mass */
    *switches += switch_monomers();
@@ -87,6 +87,10 @@ void worm_update( int *additions, int *removals, int *m_additions, int *m_remova
    int flavorlist[N_FLAVOR] = {0,0};
    flavorlist[f] = 1;
    double notdone = 0;
+
+   /* During the worm measure the number of configurations with an added source,
+    * Provides a measurement of the bilinear expectation value */
+   int nsteps = 0;
 
    /* Try starting a worm at a random site */
    if( (occupation_field[f][x] == 0) && (occupation_field[f][x2] == 0) ){
@@ -120,6 +124,8 @@ void worm_update( int *additions, int *removals, int *m_additions, int *m_remova
     int step = mersenne()*5;
     int mu = mersenne()*NDIRS;
     int newx = neighbour[mu][x];
+
+    nsteps++;
 
     switch(step){
     case 0:
@@ -211,6 +217,9 @@ void worm_update( int *additions, int *removals, int *m_additions, int *m_remova
     } //switch 
   } //while notdone
   
+  /* Fix the weight
+   * There are 5 possible steps, count each as 1/5 */
+  return( (double)nsteps*m/5 ); 
 }
 
 #endif

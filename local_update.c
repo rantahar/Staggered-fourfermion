@@ -18,12 +18,12 @@ extern double linkmass;
  * field stores both, 0 for empty, 1 for monomer and 2+dir for links
  */
 extern int n_occupied[N_FLAVOR];
-extern int **occupation_field;
+extern bool **occupation_field;
 
 extern int n_fourfermion_monomer;
 extern int n_mass_monomer[N_FLAVOR];
-extern int *fourfermion_monomer;
-extern int **mass_monomer;
+extern bool *fourfermion_monomer;
+extern bool **mass_monomer;
 
 /* Neighbour index arrays
  */

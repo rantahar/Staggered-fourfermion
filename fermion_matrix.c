@@ -8,7 +8,7 @@
 
 #include "Staggered.h"
 
-extern int **occupation_field;
+extern bool **occupation_field;
 extern int n_occupied[N_FLAVOR];
 extern int **neighbour;
 extern int **eta;
@@ -279,7 +279,9 @@ void init_Dinv(){
     //Save to file
     write_Dinv();
   }
-  
+
+  printf("Propagator matrix initialized\n");
+
 }
 
 
@@ -376,21 +378,21 @@ int ** bc_evenlist, ** bc_oddlist;
 
 /* Matrices needed for the fluctuation matrix */
 double ***BAP, ***PAC, ***BGC, **Ginv;
-int **newsite,***newcombination;
+unsigned char **newsite,***newcombination;
 
 /* Invert the matrix of propagators between occupied sites
  * Assign the current configuration as the background
  */
 void update_background( int f )
 {
-  /* Initialize everythin on the first call */
+  /* Initialize everything on the first call */
   static int init = 1;
   if(init==1){
     Ginv = malloc(N_FLAVOR*sizeof(double*));
     BAP = malloc(N_FLAVOR*sizeof(double*));
     PAC = malloc(N_FLAVOR*sizeof(double*));
     BGC = malloc(N_FLAVOR*sizeof(double*));
-    newsite = malloc(N_FLAVOR*sizeof(int*));
+    newsite = malloc(N_FLAVOR*sizeof(unsigned char*));
     newcombination = malloc(N_FLAVOR*sizeof(int**));
     bc_occupation_field = malloc(N_FLAVOR*sizeof(int*));
     bc_evenlist = malloc(N_FLAVOR*sizeof(int*));
@@ -400,17 +402,22 @@ void update_background( int f )
       Ginv[n] = malloc(VOLUME*VOLUME/4*sizeof(double));
       BAP[n] = malloc(VOLUME/2*sizeof(double*));
       PAC[n] = malloc(VOLUME/2*sizeof(double*));
-      BGC[n] = malloc(VOLUME/2*sizeof(double*));
       for(int i=0; i<VOLUME/2; i++){
-        BAP[n][i] = malloc(VOLUME/2*sizeof(double));
-        PAC[n][i] = malloc(VOLUME/2*sizeof(double));
-        BGC[n][i] = malloc(VOLUME/2*sizeof(double));
+        BAP[n][i] = NULL;
+        PAC[n][i] = NULL;
       }
    
-      newsite[n] = malloc( sizeof(int)*VOLUME );
-      newcombination[n] = malloc( sizeof(int*)*VOLUME );
+      newsite[n] = malloc( sizeof(bool)*VOLUME );
+#ifndef SAVE_MEMORY
+      BGC[n] = malloc(VOLUME/2*sizeof(double*));
+      for(int i=0; i<VOLUME/2; i++) BGC[n][i] = malloc(VOLUME/2*sizeof(double));
+      newcombination[n] = malloc( sizeof(bool*)*VOLUME );
       for(int i=0; i<VOLUME; i++)
-        newcombination[n][i] = malloc( sizeof(int)*VOLUME );
+        newcombination[n][i] = malloc( sizeof(bool)*VOLUME );
+#else
+      BGC[n] = malloc(max_fluctuations*sizeof(double*));
+      for(int i=0; i<max_fluctuations; i++) BGC[n][i] = malloc(max_fluctuations*sizeof(double));
+#endif
 
       bc_occupation_field[n] = malloc( VOLUME*sizeof(int) );
       bc_evenlist[n] = malloc( VOLUME/2*sizeof(int) );
@@ -488,7 +495,20 @@ void update_background( int f )
 
   /* Mark fluctuation matrix at all sites as not calculated */
   for( int a=0; a<VOLUME; a++ ) newsite[f][a] = 1;
+#ifndef SAVE_MEMORY
   for( int a=0; a<VOLUME; a++ ) for( int b=0; b<VOLUME; b++ ) newcombination[f][a][b] = 1;
+#endif
+  for(int i=0; i<VOLUME/2; i++){
+    if( PAC[f][i] != NULL ){
+      free(PAC[f][i]);
+      PAC[f][i] = NULL;
+    }
+    if( BAP[f][i] != NULL ){
+      free(BAP[f][i]);
+      BAP[f][i] = NULL; 
+    }
+  }
+
 
   if(init==1) init = 0;
 
@@ -586,13 +606,14 @@ double determinant( int f ){
   for( int b=0; b<n_added_even; b++) if( newsite[f][added_evenlist[b]] == 1 ){
     double D[n_bc];
     for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
+    BAP[f][added_evenlist[b]] = malloc(VOLUME/2*sizeof(double));
     for( int a=0; a<n_bc; a++)
     {
       double sum=0;
       double G[n_bc];
       for( int l=0; l<n_bc; l++) G[l] = Ginv[f][l+a*n_bc];
       for( int l=0; l<n_bc; l++) sum += D[l]*G[l];
-      BAP[f][a][added_evenlist[b]] = sum;
+      BAP[f][added_evenlist[b]][a] = sum;
     }
     newsite[f][added_evenlist[b]] = 0;
   }
@@ -600,6 +621,7 @@ double determinant( int f ){
   for( int a=0; a<n_added_odd; a++) if( newsite[f][VOLUME/2+added_oddlist[a]] == 1 ){
     double D[n_bc];
     for( int k=0; k<n_bc; k++) D[k] = Dinv[added_oddlist[a]+bc_evenlist[f][k]*VOLUME/2];
+    PAC[f][added_oddlist[a]] = malloc(VOLUME/2*sizeof(double));
     for( int b=0; b<n_bc; b++)  { 
       double sum = 0;
       double G[n_bc];
@@ -610,7 +632,9 @@ double determinant( int f ){
     newsite[f][VOLUME/2+added_oddlist[a]] = 0;
   }
 
-  for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++) 
+
+#ifndef SAVE_MEMORY
+  for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++)
     if( newcombination[f][added_evenlist[b]][VOLUME/2+added_oddlist[a]] == 1 )
   {
     double sum = 0;
@@ -622,6 +646,19 @@ double determinant( int f ){
       Dinv[added_oddlist[a]+added_evenlist[b]*VOLUME/2] + sum;
     newcombination[f][added_evenlist[b]][VOLUME/2+added_oddlist[a]] = 0;
   }
+#else
+  for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++)
+  {
+    double sum = 0;
+    double D[n_bc], P[n_bc];
+    for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
+    for( int l=0; l<n_bc; l++) P[l] = PAC[f][added_oddlist[a]][l];
+    for( int l=0; l<n_bc; l++) sum += D[l]*P[l];
+    BGC[f][b][a] =
+      Dinv[added_oddlist[a]+added_evenlist[b]*VOLUME/2] + sum;
+  }
+#endif
+
 
 
   /* Pick entries for the fluctuation matrix */
@@ -632,10 +669,14 @@ double determinant( int f ){
   for( int a=0; a<n_added_odd; a++) for( int b=0; b<n_removed_odd; b++)
     F[(n_removed_even+a)*n_fl+b] = PAC[f][added_oddlist[a]][removed_oddlist[b]];
   for( int a=0; a<n_removed_even; a++) for( int b=0; b<n_added_even; b++)
-    F[a*n_fl+(n_removed_odd+b)] = BAP[f][removed_evenlist[a]][added_evenlist[b]];
+    F[a*n_fl+(n_removed_odd+b)] = BAP[f][added_evenlist[b]][removed_evenlist[a]];
+#ifndef SAVE_MEMORY
   for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++)
     F[(n_removed_even+a)*n_fl+(n_removed_odd+b)] = BGC[f][added_evenlist[b]][added_oddlist[a]];
-
+#else
+  for( int b=0; b<n_added_even; b++) for( int a=0; a<n_added_odd; a++)
+    F[(n_removed_even+a)*n_fl+(n_removed_odd+b)] = BGC[f][b][a];
+#endif
 
   /* determinant from LU */
   double det=1;

@@ -3,6 +3,7 @@
 #include <math.h>
 #include "mersenne.h"
 #include <lapacke/lapacke.h>
+#include <stdbool.h>
 //#include <lapacke.h>
 #include <time.h>
 #include <sys/time.h>
@@ -14,7 +15,7 @@
 /* Lattice size and dimensions */
 #define ND 4
 /* Size of the lattice dimensions */
-static int Ldim[ND] = { 4, 4, 4, 4 };
+static int Ldim[ND] = { 12, 12, 12, 12 };
 
 #define NDIRS (2*ND)
 int VOLUME;
@@ -40,6 +41,12 @@ int VOLUME;
 
 /* Toggle direct measurement for site and link vev */
 //#ifdef MEASUREVEV
+
+/* Save memory to fit large lattices
+ * Reduces memory use significantly and
+ * slightly increases compute times
+ */
+#define SAVE_MEMORY
 
 /* field values */
 #define UNOCCUPIED 0
@@ -71,7 +78,7 @@ void update_background( int monomer );
 void measure_vev( double * linkvev, double * sitevev );
 
 /* update functions */
-void worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches );
+double worm_update( int *additions, int *removals, int *m_additions, int *m_removals, int *switches );
 void local_update( int *additions, int *removals, int *moves,int *m_additions, int *m_removals, int *m_moves, int *switches );
 
 
