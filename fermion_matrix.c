@@ -36,14 +36,26 @@ void update_current_determinant( int do_flavor[N_FLAVOR] ){
   for(int n=0; n<N_FLAVOR;n++) if(do_flavor[n]) current_determinant[n] = new_determinant[n];
 }
 
+void * wrapmalloc( int size, size_t bitsize ){
+  void * pointer=NULL;
+  pointer = calloc(size,bitsize);
+  if( pointer == NULL ){
+    printf("Could not allocate memory. Size %d,%lu.\n",size,bitsize);
+  }
+  return pointer;
+}
+
+
 
 /* Definitions of the fermion matrix */
 #ifdef MASS_IN_MATRIX
 #ifdef ANTIPERIODIC
 void init_fermion_matrix( ) {
+ static int init = 1;
+ if(init==1){
   /* Set up the fermion matrix */
   int n = VOLUME;
-  D = malloc(n*n*sizeof(double));
+  D = wrapmalloc(n*n,sizeof(double));
   for( int i=0;i<n*n;i++)  D[i] = 0;
   
   for( int x1=0;x1<n;x1++){
@@ -63,15 +75,44 @@ void init_fermion_matrix( ) {
       if( v1[nu] == 0 ) bc_sign = -1;
     }
   }
+  init = 0;
+ }
 }
+
+
+void Dv( double * y, double * x ){
+  /* Set up the fermion matrix */
+  int n = VOLUME;
+  int v1[ND];
+  
+  for( int x1=0;x1<n;x1++) y[x1] = m*x[x1];
+  for( int x1=0;x1<n;x1++){
+    site_index_to_vector(x1,v1);
+    for( int nu=0;nu<ND;nu++){
+      int x2 = neighbour[nu][x1];
+      int bc_sign = 1;
+      if( v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      y[x1] += bc_sign * ( 0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+
+      int onu = ( nu + ND ) % NDIRS;
+      x2 = neighbour[onu][x1];
+      bc_sign = 1;
+      if( v1[nu] == 0 ) bc_sign = -1;
+      y[x1] += bc_sign * ( -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+    }
+  }
+}
+
 #endif
 
 #ifdef PERIODIC //Periodic boundaries in spatial directions
 void init_fermion_matrix( )
 {
+ static int init = 1;
+ if(init==1){
   /* Set up the fermion matrix */
   int n = VOLUME;
-  D = malloc(n*n*sizeof(double));
+  D = wrapmalloc(n*n,sizeof(double));
   for( int i=0;i<n*n;i++)  D[i] = 0;
   
   for( int x1=0;x1<n;x1++){
@@ -103,7 +144,33 @@ void init_fermion_matrix( )
       D[x1+n*x2] += -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
     }
   }
+  init = 0;
+ }
 }
+
+void Dv( double * y, double * x ){
+  /* Set up the fermion matrix */
+  int n = VOLUME;
+  int v1[ND];
+  
+  for( int x1=0;x1<n;x1++) y[x1] = m*x[x1];
+  for( int x1=0;x1<n;x1++){
+    site_index_to_vector(x1,v1);
+    for( int nu=0;nu<ND;nu++){
+      int x2 = neighbour[nu][x1];
+      int bc_sign = 1;
+      if( nu==0 && v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      y[x1] += bc_sign * ( 0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+
+      int onu = ( nu + ND ) % NDIRS;
+      x2 = neighbour[onu][x1];
+      bc_sign = 1;
+      if( nu==0 && v1[nu] == 0 ) bc_sign = -1;
+      y[x1] += bc_sign * ( -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+    }
+  }
+}
+
 #endif
 
 #else //MASS_IN_MATRIX
@@ -111,9 +178,11 @@ void init_fermion_matrix( )
 #ifdef ANTIPERIODIC //Antiperiodic boundaries
 void init_fermion_matrix( )
 {
+ static int init = 1;
+ if(init==1){
   /* Set up the fermion matrix */
   int n = VOLUME;
-  D = malloc(n*n*sizeof(double));
+  D = wrapmalloc(n*n,sizeof(double));
   for( int i=0;i<n*n;i++)  D[i] = 0;
   
   for( int x1=0;x1<n;x1++){
@@ -133,15 +202,44 @@ void init_fermion_matrix( )
       D[x1+n*x2] += -0.5 * bc_sign * eta[nu][x1] + bc_sign * linkmass * ksi[nu][x1] ;
     }
   }
+  init = 0;
+ }
 }
+
+void Dv( double * y, double * x ){
+  /* Set up the fermion matrix */
+  int n = VOLUME;
+  int v1[ND];
+  
+  for( int x1=0;x1<n;x1++) y[x1] = 0;
+  for( int x1=0;x1<n;x1++){
+    site_index_to_vector(x1,v1);
+    for( int nu=0;nu<ND;nu++){
+      int x2 = neighbour[nu][x1];
+      int bc_sign = 1;
+      if( v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      y[x1] += bc_sign * ( 0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+
+      int onu = ( nu + ND ) % NDIRS;
+      x2 = neighbour[onu][x1];
+      bc_sign = 1;
+      if( v1[nu] == 0 ) bc_sign = -1;
+      y[x1] += bc_sign * ( -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+    }
+  }
+}
+
+
 #endif
 
 #ifdef PERIODIC //Periodic boundaries in spatial directions
 void init_fermion_matrix( )
 {
+ static int init = 1;
+ if(init==1){
   /* Set up the fermion matrix */
   int n = VOLUME;
-  D = malloc(n*n*sizeof(double));
+  D = wrapmalloc(n*n,sizeof(double));
   for( int i=0;i<n*n;i++)  D[i] = 0;
   
   for( int x1=0;x1<n;x1++){
@@ -172,8 +270,33 @@ void init_fermion_matrix( )
       D[x1+n*x2] += -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1] ;
     }
   }
-
+  init = 0;
+ }
 }
+
+void Dv( double * y, double * x ){
+  /* Set up the fermion matrix */
+  int n = VOLUME;
+  int v1[ND];
+  
+  for( int x1=0;x1<n;x1++) y[x1] = 0;
+  for( int x1=0;x1<n;x1++){
+    site_index_to_vector(x1,v1);
+    for( int nu=0;nu<ND;nu++){
+      int x2 = neighbour[nu][x1];
+      int bc_sign = 1;
+      if( nu==0 && v1[nu] == (Ldim[nu]-1) ) bc_sign = -1;
+      y[x1] += bc_sign * ( 0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+
+      int onu = ( nu + ND ) % NDIRS;
+      x2 = neighbour[onu][x1];
+      bc_sign = 1;
+      if( nu==0 && v1[nu] == 0 ) bc_sign = -1;
+      y[x1] += bc_sign * ( -0.5 * eta[nu][x1] + linkmass * ksi[nu][x1]) * x[x2] ;
+    }
+  }
+}
+
 #endif
 #endif //MASS_IN_MATRIX
 
@@ -181,10 +304,10 @@ void init_fermion_matrix( )
 /* Set up indexes at even and odd sites */
 void init_evenodd_index( )
 {
-  even_to_global_index = malloc( VOLUME/2*sizeof(int) );
-  odd_to_global_index  = malloc( VOLUME/2*sizeof(int) );
-  global_to_even_index = malloc( VOLUME*sizeof(int) );
-  global_to_odd_index = malloc( VOLUME*sizeof(int) );
+  even_to_global_index = wrapmalloc( VOLUME/2,sizeof(int) );
+  odd_to_global_index  = wrapmalloc( VOLUME/2,sizeof(int) );
+  global_to_even_index = wrapmalloc( VOLUME,sizeof(int) );
+  global_to_odd_index = wrapmalloc( VOLUME,sizeof(int) );
   int ie=0, io=0;
   int v[ND];
   for(int x=0; x<VOLUME; x++) {
@@ -208,81 +331,54 @@ void init_evenodd_index( )
 
 
 
-/* Save the propagator matrix to avoid recalculation when possible */
-void write_Dinv(){
-  FILE * Dinv_file;
-  char filename[100] = "Dinv";
-  int n = VOLUME/2;
 
-  Dinv_file = fopen(filename,"wb");
-  if (Dinv_file){
-    fwrite(Dinv, n*n, sizeof(double), Dinv_file);
-    fclose(Dinv_file);
-  } else {
-    printf("Could not write Dinv file\n");
-    exit(1);
-  }
+/* The index of a site on a staggered block */
+int block_index( int vector[ND] ){
+  int index = vector[ND-1]%2;
+  for (int dir=ND-1; dir--;) index = index*2 + vector[dir]%2;
+  return index;
 }
 
 
-/* Initialize the propagator matrix, from the file if possible */
-void init_Dinv(){
-  
-  init_evenodd_index();
+/* Return the inverse of the Dirac operator for two given sites */
+double Dinvf( int io, int ie ){
+    int boundary_sign = 1;
+    int ve[ND],vo[ND];
+    //printf(" %d %d\n",io,ie);
 
-  // Try loading from the file
-  FILE * Dinv_file;
-  char filename[100] = "Dinv";
-  int n = VOLUME/2;
-  Dinv = malloc(n*n*sizeof(double));
+    //Get sites as vectors
+    io = odd_to_global_index[io];
+    site_index_to_vector(io,vo);
+    ie = even_to_global_index[ie];
+    site_index_to_vector(ie,ve);
 
-  Dinv_file = fopen(filename,"rb");
-  if (Dinv_file){
-    printf("Reading Dinv\n");
-    fread(Dinv, n*n, sizeof(double), Dinv_file);
-    fclose(Dinv_file);
-  } else {
+    //printf(" (%d,%d,%d,%d) (%d,%d,%d,%d)\n",vo[0],vo[1],vo[2],vo[3],ve[0],ve[1],ve[2],ve[3]);
 
-    /* File not found or loading failed */
-    printf("No Dinv file\n");
-    init_fermion_matrix( );
-    
-    int info;
-    int *ipiv;
-    ipiv = malloc( n*sizeof(int) );
-    for(int i=0; i<n*n; i++) Dinv[i] = 0;
+    //Translate so that the even site is on the first block
+    for( int nu = 0; nu<ND; nu++ ) {
+       int evenblock = ve[nu]/2;
+       vo[nu] -= evenblock*2 ;
+       ve[nu] -= evenblock*2 ;
 
-    /* Construct the even to odd matrix */
-    for(int ie=0; ie<n; ie++) for(int io=0; io<n; io++){
-      Dinv[ie+n*io] = D[even_to_global_index[ie]+VOLUME*odd_to_global_index[io]] ;
+       //Correct for antiperiodic boundaries
+       if( vo[nu] < 0 ){
+          boundary_sign *=-1;
+          vo[nu] += Ldim[nu];
+       }
     }
 
-    /* Invert using lapack routines */
-    int lwork=n*n;
-    double *work;
-    work = malloc( lwork*sizeof(double) );
-    LAPACK_dgetrf( &n, &n, Dinv, &n, ipiv, &info );
-    if( info != 0 ) {
-      printf("init_Dinv: sgetrf returned an error %d! \n", info);
-      exit(-1);
-    }
+    //printf(" (%d,%d,%d,%d) (%d,%d,%d,%d)\n", vo[0],vo[1],vo[2],vo[3], ve[0],ve[1],ve[2],ve[3] );
 
-    LAPACK_dgetri(&n, Dinv, &n, ipiv, work, &lwork, &info); 
-    if( info != 0 ) {
-      printf("init_Dinv: sgetri returned an error %d! \n", info);
-      exit(-1);
-    }
-  
-    free(work);
-    free(ipiv);
-    free(D);
-    //Save to file
-    write_Dinv();
-  }
+    //Back to indexes
+    io = site_vector_to_index(vo);
+    io = global_to_odd_index[io];
+    ie = block_index(ve);
 
-  printf("Propagator matrix initialized\n");
+    //printf(" %d %d %g\n\n",io,ie,boundary_sign*Dinv[ io + ie*VOLUME/2 ]);
 
+    return boundary_sign*Dinv[ io + ie*VOLUME/2 ];
 }
+
 
 
 
@@ -293,10 +389,10 @@ double determinant( int f ){
   /* Initialize everything on the first time */
   static int init = 1;
   if(init) {
-    init_fermion_matrix( );
     init = 0;
     current_determinant[0] = current_determinant[1] = 1;
   }
+  init_fermion_matrix( );
  
   /* The size of the matrix */
   int n=(VOLUME-n_occupied[f]);
@@ -307,12 +403,10 @@ double determinant( int f ){
     return( new_determinant[f]/current_determinant[f] );
   }
 
-  
-
   /* Build a list of free sites */
   int v[ND];
   int *freelist;
-  freelist = malloc( n*sizeof(int) );
+  freelist = wrapmalloc( n,sizeof(int) );
   int ind=0;
   for(int x=0; x<VOLUME; x++) if( occupation_field[f][x]==0 ) {
     freelist[ind] = x;
@@ -320,7 +414,7 @@ double determinant( int f ){
   }
   
   /* Construct the matrix of free sites*/
-  double *M = malloc(n*n*sizeof(double));
+  double *M = wrapmalloc(n*n,sizeof(double));
   for(int i=0; i<n*n; i++) M[i] = 0;
   for(int i1=0; i1<n; i1++) for(int i2=0; i2<n; i2++){
     M[i1+n*i2] = D[freelist[i1]+VOLUME*freelist[i2]] ;
@@ -329,7 +423,7 @@ double determinant( int f ){
   /* Use lapack to calculate the LU decompisition */
   int info;
   int *ipiv;
-  ipiv = malloc( n*sizeof(int) );
+  ipiv = wrapmalloc( n,sizeof(int) );
   LAPACK_dgetrf( &n, &n, M, &n, ipiv, &info );
 
   /* Calculate the determinant */
@@ -339,17 +433,21 @@ double determinant( int f ){
     if( ipiv[i] != i+1 ) det*=-1; 
   }
   
+#ifndef MASS_IN_MATRIX
   /* Check for negative determinants (in most cases this is debugging) */
+  /* Note that individual negative determinant are natural with MASS_IN_MATRIX,
+   * both flavors need to be take into account to get a positive determinant*/
   if((det/current_determinant[f])<-1e-30) {
     static int n=0;
     printf("NEGATIVE determinant %d %g %g\n",n, det/current_determinant[f] ,det);
     n++;
   }
+#endif
 
   free(M);
   free(ipiv);
   free(freelist);
-
+  
   new_determinant[f] = det;
   return( new_determinant[f]/current_determinant[f] );
 }
@@ -388,42 +486,42 @@ void update_background( int f )
   /* Initialize everything on the first call */
   static int init = 1;
   if(init==1){
-    Ginv = malloc(N_FLAVOR*sizeof(double*));
-    BAP = malloc(N_FLAVOR*sizeof(double*));
-    PAC = malloc(N_FLAVOR*sizeof(double*));
-    BGC = malloc(N_FLAVOR*sizeof(double*));
-    newsite = malloc(N_FLAVOR*sizeof(unsigned char*));
-    newcombination = malloc(N_FLAVOR*sizeof(int**));
-    bc_occupation_field = malloc(N_FLAVOR*sizeof(int*));
-    bc_evenlist = malloc(N_FLAVOR*sizeof(int*));
-    bc_oddlist = malloc(N_FLAVOR*sizeof(int*));
+    Ginv = wrapmalloc(N_FLAVOR,sizeof(double*));
+    BAP = wrapmalloc(N_FLAVOR,sizeof(double*));
+    PAC = wrapmalloc(N_FLAVOR,sizeof(double*));
+    BGC = wrapmalloc(N_FLAVOR,sizeof(double*));
+    newsite = wrapmalloc(N_FLAVOR,sizeof(unsigned char*));
+    newcombination = wrapmalloc(N_FLAVOR,sizeof(int**));
+    bc_occupation_field = wrapmalloc(N_FLAVOR,sizeof(int*));
+    bc_evenlist = wrapmalloc(N_FLAVOR,sizeof(int*));
+    bc_oddlist = wrapmalloc(N_FLAVOR,sizeof(int*));
 
     for( int n=0; n<N_FLAVOR; n++){
-      Ginv[n] = malloc(VOLUME*VOLUME/4*sizeof(double));
-      BAP[n] = malloc(VOLUME/2*sizeof(double*));
-      PAC[n] = malloc(VOLUME/2*sizeof(double*));
+      Ginv[n] = NULL;
+      BAP[n] = wrapmalloc(VOLUME/2,sizeof(double*));
+      PAC[n] = wrapmalloc(VOLUME/2,sizeof(double*));
       for(int i=0; i<VOLUME/2; i++){
         BAP[n][i] = NULL;
         PAC[n][i] = NULL;
       }
    
-      newsite[n] = malloc( sizeof(bool)*VOLUME );
+      newsite[n] = wrapmalloc( VOLUME,sizeof(bool) );
 #ifndef SAVE_MEMORY
-      BGC[n] = malloc(VOLUME/2*sizeof(double*));
-      for(int i=0; i<VOLUME/2; i++) BGC[n][i] = malloc(VOLUME/2*sizeof(double));
-      newcombination[n] = malloc( sizeof(bool*)*VOLUME );
+      BGC[n] = wrapmalloc(VOLUME/2,sizeof(double*));
+      for(int i=0; i<VOLUME/2; i++) BGC[n][i] = wrapmalloc(VOLUME/2,sizeof(double));
+      newcombination[n] = wrapmalloc( VOLUME,sizeof(bool*) );
       for(int i=0; i<VOLUME; i++)
-        newcombination[n][i] = malloc( sizeof(bool)*VOLUME );
+        newcombination[n][i] = wrapmalloc( VOLUME,sizeof(bool) );
 #else
-      BGC[n] = malloc(max_fluctuations*sizeof(double*));
-      for(int i=0; i<max_fluctuations; i++) BGC[n][i] = malloc(max_fluctuations*sizeof(double));
+      BGC[n] = wrapmalloc(max_fluctuations,sizeof(double*));
+      for(int i=0; i<max_fluctuations; i++) BGC[n][i] = wrapmalloc(max_fluctuations,sizeof(double));
 #endif
 
-      bc_occupation_field[n] = malloc( VOLUME*sizeof(int) );
-      bc_evenlist[n] = malloc( VOLUME/2*sizeof(int) );
-      bc_oddlist[n]  = malloc( VOLUME/2*sizeof(int) );
+      bc_occupation_field[n] = wrapmalloc( VOLUME,sizeof(int) );
+      bc_evenlist[n] = wrapmalloc( VOLUME/2,sizeof(int) );
+      bc_oddlist[n]  = wrapmalloc( VOLUME/2,sizeof(int) );
     }
-    init_Dinv( );
+    init_Dinv_cg();
   }
 
   /* The current configuration becomes the background */
@@ -438,7 +536,11 @@ void update_background( int f )
   /* Invert the background matrix
    * Lapack fails for rank zero, so skip   */
   if( n_bc > 0 ){
-    int *ipiv = malloc( n_bc*sizeof(int) );
+
+    if( Ginv[f] != NULL) free(Ginv[f]);
+    Ginv[f] = wrapmalloc(n_bc*n_bc,sizeof(double));
+
+    int *ipiv = wrapmalloc( n_bc,sizeof(int) );
     int info;
   
     /* Find occupied and unoccupied sites, construct lists */
@@ -468,7 +570,7 @@ void update_background( int f )
 
     /* Construct the inverse of the matrix propagators over occupied sites */
     for(int ie=0; ie<n_bc; ie++) for(int io=0; io<n_bc; io++){
-      Ginv[f][ie+n_bc*io] = Dinv[bc_oddlist[f][io]+VOLUME/2*bc_evenlist[f][ie]];
+      Ginv[f][ie+n_bc*io] = Dinvf(bc_oddlist[f][io],bc_evenlist[f][ie]);
     }
     LAPACK_dgetrf( &n_bc, &n_bc, Ginv[f], &n_bc, ipiv, &info );
     if( info != 0 ) {
@@ -479,7 +581,7 @@ void update_background( int f )
     /* The inversion */
     int lwork=n_bc*n_bc;
     double *work;
-    work = malloc( lwork*sizeof(double) );
+    work = wrapmalloc( lwork,sizeof(double) );
     if (NULL == work) {
       printf("failed to allocate work matrix in update_background (size n_bc=%d) \n",n_bc);
       exit(-1);
@@ -553,10 +655,10 @@ double determinant( int f ){
   int v[ND];
   static int init = 1;
   if(init == 1){
-    added_evenlist = malloc( max_fluctuations*sizeof(int) );
-    added_oddlist  = malloc( max_fluctuations*sizeof(int) );
-    removed_evenlist = malloc( max_fluctuations*sizeof(int) );
-    removed_oddlist  = malloc( max_fluctuations*sizeof(int) );
+    added_evenlist = wrapmalloc( max_fluctuations,sizeof(int) );
+    added_oddlist  = wrapmalloc( max_fluctuations,sizeof(int) );
+    removed_evenlist = wrapmalloc( max_fluctuations,sizeof(int) );
+    removed_oddlist  = wrapmalloc( max_fluctuations,sizeof(int) );
     init = 0;
   }
   for(int x=0; x<VOLUME; x++) if(occupation_field[f][x] != bc_occupation_field[f][x]) {
@@ -605,8 +707,8 @@ double determinant( int f ){
   /* Construct new parts of the fluctuation matrix */
   for( int b=0; b<n_added_even; b++) if( newsite[f][added_evenlist[b]] == 1 ){
     double D[n_bc];
-    for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
-    BAP[f][added_evenlist[b]] = malloc(VOLUME/2*sizeof(double));
+    for( int l=0; l<n_bc; l++) D[l] = Dinvf(bc_oddlist[f][l],added_evenlist[b]); 
+    BAP[f][added_evenlist[b]] = wrapmalloc(VOLUME/2,sizeof(double));
     for( int a=0; a<n_bc; a++)
     {
       double sum=0;
@@ -620,8 +722,8 @@ double determinant( int f ){
 
   for( int a=0; a<n_added_odd; a++) if( newsite[f][VOLUME/2+added_oddlist[a]] == 1 ){
     double D[n_bc];
-    for( int k=0; k<n_bc; k++) D[k] = Dinv[added_oddlist[a]+bc_evenlist[f][k]*VOLUME/2];
-    PAC[f][added_oddlist[a]] = malloc(VOLUME/2*sizeof(double));
+    for( int k=0; k<n_bc; k++) D[k] = Dinvf(added_oddlist[a],bc_evenlist[f][k]);
+    PAC[f][added_oddlist[a]] = wrapmalloc(VOLUME/2,sizeof(double));
     for( int b=0; b<n_bc; b++)  { 
       double sum = 0;
       double G[n_bc];
@@ -639,11 +741,11 @@ double determinant( int f ){
   {
     double sum = 0;
     double D[n_bc], P[n_bc];
-    for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
+    for( int l=0; l<n_bc; l++) D[l] = Dinvf(bc_oddlist[f][l],added_evenlist[b]);
     for( int l=0; l<n_bc; l++) P[l] = PAC[f][added_oddlist[a]][l];
     for( int l=0; l<n_bc; l++) sum += D[l]*P[l];
     BGC[f][added_evenlist[b]][added_oddlist[a]] =
-      Dinv[added_oddlist[a]+added_evenlist[b]*VOLUME/2] + sum;
+      Dinvf(added_oddlist[a],added_evenlist[b]) + sum;
     newcombination[f][added_evenlist[b]][VOLUME/2+added_oddlist[a]] = 0;
   }
 #else
@@ -651,11 +753,11 @@ double determinant( int f ){
   {
     double sum = 0;
     double D[n_bc], P[n_bc];
-    for( int l=0; l<n_bc; l++) D[l] = Dinv[bc_oddlist[f][l]+added_evenlist[b]*VOLUME/2];
+    for( int l=0; l<n_bc; l++) D[l] = Dinvf(bc_oddlist[f][l],added_evenlist[b]);
     for( int l=0; l<n_bc; l++) P[l] = PAC[f][added_oddlist[a]][l];
     for( int l=0; l<n_bc; l++) sum += D[l]*P[l];
     BGC[f][b][a] =
-      Dinv[added_oddlist[a]+added_evenlist[b]*VOLUME/2] + sum;
+      Dinvf(added_oddlist[a],added_evenlist[b]) + sum;
   }
 #endif
 
@@ -663,7 +765,7 @@ double determinant( int f ){
 
   /* Pick entries for the fluctuation matrix */
   double *F;
-  F = malloc(n_fl*n_fl*sizeof(double));
+  F = wrapmalloc(n_fl*n_fl,sizeof(double));
   for( int b=0; b<n_removed_odd; b++) for( int a=0; a<n_removed_even; a++)
     F[a*n_fl+b] = Ginv[f][removed_oddlist[b]+removed_evenlist[a]*n_bc];
   for( int a=0; a<n_added_odd; a++) for( int b=0; b<n_removed_odd; b++)
@@ -854,16 +956,14 @@ double det_remove_monomers1(int x1, int do_flavor[N_FLAVOR]){
 #ifdef MEASUREVEV
 /* Calculate the link vev */
 void measure_vev( double * linkvev, double * sitevev ){
-#ifndef MASS_IN_MATRIX
   init_fermion_matrix( );
-#endif  
 
   int n = VOLUME ;
   
   int info;
   int *ipiv;
-  ipiv = malloc( n*sizeof(int) );
-  double *Dinv = malloc( n*n*sizeof(double) );
+  ipiv = wrapmalloc( n,sizeof(int) );
+  double *Dinv = wrapmalloc( n*n,sizeof(double) );
   for(int i=0; i<n*n; i++) Dinv[i] = 0;
 
   /* Construct the even to odd matrix
@@ -884,7 +984,7 @@ void measure_vev( double * linkvev, double * sitevev ){
   /* Invert using lapack routines */
   int lwork=n*n;
   double *work;
-  work = malloc( lwork*sizeof(double) );
+  work = wrapmalloc( lwork,sizeof(double) );
   LAPACK_dgetrf( &n, &n, Dinv, &n, ipiv, &info );
   if( info != 0 ) {
     printf("init_Dinv: sgetrf returned an error %d! \n", info);
@@ -940,10 +1040,6 @@ void measure_vev( double * linkvev, double * sitevev ){
   free(work);
   free(ipiv);
   free(Dinv);
-
-#ifndef MASS_IN_MATRIX
-  free(D);
-#endif
 
 }
 #endif

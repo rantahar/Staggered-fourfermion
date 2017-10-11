@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mersenne.h"
-#include <lapacke/lapacke.h>
+//#include <lapacke/lapacke.h>
 #include <stdbool.h>
-//#include <lapacke.h>
+#include <lapacke.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -15,7 +15,7 @@
 /* Lattice size and dimensions */
 #define ND 4
 /* Size of the lattice dimensions */
-static int Ldim[ND] = { 12, 12, 12, 12 };
+static int Ldim[ND] = { 4, 4, 4, 4 };
 
 #define NDIRS (2*ND)
 int VOLUME;
@@ -40,7 +40,7 @@ int VOLUME;
 #define FLUCTUATION_DETERMINANT
 
 /* Toggle direct measurement for site and link vev */
-//#ifdef MEASUREVEV
+//#define MEASUREVEV
 
 /* Save memory to fit large lattices
  * Reduces memory use significantly and
@@ -60,10 +60,10 @@ void site_index_to_vector(int index, int vector[] );
 void print_config();
 
 /* In fermion_matrix.c */
-double fM_index( int x1[ND], int x2[ND] );
+void Dv( double * y, double * x );
 void calc_Dinv( );
 double determinant();
-
+void * wrapmalloc( int size, size_t bitsize );
 
 double det_add_monomers(int x1, int x2, int do_flavor[N_FLAVOR]);
 double det_move_monomers(int x1, int x2, int do_flavor[N_FLAVOR]);
@@ -82,4 +82,8 @@ double worm_update( int *additions, int *removals, int *m_additions, int *m_remo
 void local_update( int *additions, int *removals, int *moves,int *m_additions, int *m_removals, int *m_moves, int *switches );
 
 
+/* Inversions */
+void init_Dinv_cg();
+void init_Dinv_deprecated();
+void cg( double *source );
 

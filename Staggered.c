@@ -53,7 +53,7 @@ void write_config(){
   char filename[100];
   sprintf(filename, "config_checkpoint_U%.6gm%.6g",U,m);
 
-  int * buffer = malloc((1+2*N_FLAVOR)*VOLUME*sizeof(int));
+  int * buffer = wrapmalloc((1+2*N_FLAVOR),VOLUME*sizeof(int));
   for (int i=0; i<VOLUME; i++) {
     buffer[(1+2*N_FLAVOR)*i] =  fourfermion_monomer[i];
     for (int f=0; f<N_FLAVOR; f++)
@@ -80,7 +80,7 @@ void read_config(){
   sprintf(filename, "config_checkpoint_U%.6gm%.6g",U,m);
 
   config_file = fopen(filename,"rb");
-  int * buffer = malloc((1+2*N_FLAVOR)*VOLUME*sizeof(int));
+  int * buffer = wrapmalloc((1+2*N_FLAVOR)*VOLUME,sizeof(int));
   if (config_file){
     int read_size = fread(buffer, sizeof(int), (1+2*N_FLAVOR)*VOLUME, config_file);
     fclose(config_file);
@@ -206,8 +206,9 @@ void susceptibility_aa(){
       /* Try to turn on two monomers */
       double p = det_add_monomers( x1, x2, flavorlist );
       if( mersenne() < p ){
-        occupation_field[f][x1]=1;
-        occupation_field[f][x2]=1;
+        occupation_field[f][x1]=OCCUPIED;
+        occupation_field[f][x2]=OCCUPIED;
+        n_occupied[f]+=2;
         update_current_determinant(flavorlist);
         notdone = 1;
       }
@@ -225,6 +226,7 @@ void susceptibility_aa(){
             if( mersenne() < p ){
               occupation_field[f][x1]=UNOCCUPIED;
               occupation_field[f][x2]=UNOCCUPIED;
+              n_occupied[f]-=2;
               update_current_determinant(flavorlist);
               notdone = 0;
             }
@@ -265,7 +267,7 @@ void susceptibility_ab(){
     } while ( fourfermion_monomer[x1] == UNOCCUPIED );
     /* Turn the monomer into a pair of sources */
     fourfermion_monomer[x1] = UNOCCUPIED;
-    //Occupation field remains 1
+    //Occupation field remains OCCUPIED
     int x2=x1;
     int notdone = 1;
 
@@ -425,7 +427,7 @@ int main(int argc, char* argv[])
 #ifdef LOCAL_UPDATE
   printf(" With the LOCAL update method \n" );
 #endif
-#ifdef WORM_UPDATE
+#ifdef WORM_UPDATEn_occupied
   printf(" With the WORM update method\n" );
 #endif
   printf(" %d updates\n", n_measure );
@@ -441,27 +443,27 @@ int main(int argc, char* argv[])
   for( int nu=0; nu<ND; nu++) VOLUME*=Ldim[nu];
 
   /* field marking fields as occupied of unoccupied */
-  occupation_field = malloc( N_FLAVOR*sizeof(bool*) );
+  occupation_field = wrapmalloc( N_FLAVOR,sizeof(bool*) );
   for( int i=0; i<N_FLAVOR; i++ ){
-    occupation_field[i] = malloc( VOLUME*sizeof(bool) );
+    occupation_field[i] = wrapmalloc( VOLUME,sizeof(bool) );
     for (int x=0; x<VOLUME; x++) occupation_field[i][x] = 0;
     n_occupied[i] = 0;
   }
 
   /* field for marking four fermion and mass monomers */
-  mass_monomer = malloc( N_FLAVOR*sizeof(bool*) );
+  mass_monomer = wrapmalloc( N_FLAVOR,sizeof(bool*) );
   for( int i=0; i<N_FLAVOR; i++ ){ 
-    mass_monomer[i] = malloc( VOLUME*sizeof(bool) );
+    mass_monomer[i] = wrapmalloc( VOLUME,sizeof(bool) );
     for (int x=0; x<VOLUME; x++) mass_monomer[i][x] = 0;
     n_mass_monomer[i] = 0;
   }
-  fourfermion_monomer = malloc( VOLUME*sizeof(bool) );
+  fourfermion_monomer = wrapmalloc( VOLUME,sizeof(bool) );
   for (int x=0; x<VOLUME; x++) fourfermion_monomer[x] = 0;
   n_fourfermion_monomer = 0;
 
   /* The staggered eta matrix */
-  eta = malloc( ND*sizeof(int *) );
-  for( int nu=0; nu<ND; nu++) eta[nu] = malloc( VOLUME*sizeof(int) );
+  eta = wrapmalloc( ND,sizeof(int *) );
+  for( int nu=0; nu<ND; nu++) eta[nu] = wrapmalloc( VOLUME,sizeof(int) );
   for (int x=0; x<VOLUME; x++) {
     int vector[ND];
     site_index_to_vector(x,vector);
@@ -479,8 +481,8 @@ int main(int argc, char* argv[])
   }
 
   /* The staggered eps*ksi matrix for link mass */
-  ksi = malloc( ND*sizeof(int *) );
-  for (int nu=0; nu<ND; nu++) ksi[nu] = malloc( VOLUME*sizeof(int) );
+  ksi = wrapmalloc( ND,sizeof(int *) );
+  for (int nu=0; nu<ND; nu++) ksi[nu] = wrapmalloc( VOLUME,sizeof(int) );
   for (int x=0; x<VOLUME; x++) {
     int vector[ND];
     site_index_to_vector(x,vector);
@@ -500,8 +502,8 @@ int main(int argc, char* argv[])
 
 
   /* The neighbour array */
-  neighbour = malloc( NDIRS*sizeof(int *) );
-  for( int nu=0; nu<NDIRS; nu++) neighbour[nu] = malloc( VOLUME*sizeof(int) );
+  neighbour = wrapmalloc( NDIRS,sizeof(int *) );
+  for( int nu=0; nu<NDIRS; nu++) neighbour[nu] = wrapmalloc( VOLUME,sizeof(int) );
   for (int x=0; x<VOLUME; x++) {
      int vector[ND];
      site_index_to_vector(x,vector);
