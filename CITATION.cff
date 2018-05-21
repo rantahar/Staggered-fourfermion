@@ -1,0 +1,11 @@
+cff-version: 1.0.3
+message: "Please cite the following works when using this software."
+
+title: A Fermion Bag simulation program for the staggered lattice Thirring model
+version: 1.0
+date-released: 10 May 2018
+authors:
+  - family-names: Rantaharju
+    given-names: Jarno
+    orcid:  https://orcid.org/0000-0002-0072-7707
+doi: 10.5281/zenodo.1244681
